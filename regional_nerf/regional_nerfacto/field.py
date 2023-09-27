@@ -26,7 +26,7 @@ class RNerfField(NerfactoField):
         self, **kwargs) -> None:
         super().__init__(**kwargs)
 
-        self.top_cutoff = -0.5
+        self.top_cutoff = -0.0
 
     def get_density(self, ray_samples: RaySamples) -> Tuple[Tensor, Tensor]:
         """Computes and returns the densities."""
