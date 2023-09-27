@@ -90,16 +90,16 @@ class RNerfModel(NerfactoModel):
             "depth": depth,
         }
 
-        # Extract height of samples and compute exponentially scaled density
-        # TODO: NAVLAB
-        positions = ray_samples.frustums.get_positions()
-        height = positions[..., 2][..., None]
-        weights = torch.exp(height-1.0)
-        # Normalize weights
-        weights = weights / torch.sum(weights, dim=-2, keepdim=True)
+        # # Extract height of samples and compute exponentially scaled density
+        # # TODO: NAVLAB
+        # positions = ray_samples.frustums.get_positions()
+        # height = positions[..., 2][..., None]
+        # weights = torch.exp(height-1.0)
+        # # Normalize weights
+        # weights = weights / torch.sum(weights, dim=-2, keepdim=True)
 
-        height_opacity = self.renderer_depth(weights=weights, ray_samples=ray_samples)
-        outputs["height_opacity"] = height_opacity
+        # height_opacity = self.renderer_depth(weights=weights, ray_samples=ray_samples)
+        # outputs["height_opacity"] = height_opacity
 
         if self.config.predict_normals:
             normals = self.renderer_normals(normals=field_outputs[FieldHeadNames.NORMALS], weights=weights)
@@ -131,7 +131,7 @@ class RNerfModel(NerfactoModel):
         loss_dict = super().get_loss_dict(outputs, batch, metrics_dict)
         # Add height opacity loss by its average
         # TODO: NAVLAB
-        loss_dict["height_opacity_loss"] = self.tall_loss_factor * torch.mean(
-            outputs["height_opacity"]
-            )
+        # loss_dict["height_opacity_loss"] = self.tall_loss_factor * torch.mean(
+        #     outputs["height_opacity"]
+        #     )
         return loss_dict
