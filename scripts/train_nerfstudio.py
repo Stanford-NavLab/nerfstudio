@@ -27,9 +27,15 @@ def construct_command(args):
     far_plane = args.far_plane
     num_rays_per_batch = args.num_rays_per_batch
 
-    command_list = ["ns-train regional-nerfacto"]
-    # command_list = ["ns-train nerfacto"]
+    # environment_variables = ""
+    environment_variables = "export CUDA_VISIBLE_DEVICES=0 && export CUDA_LAUNCH_BLOCKING=1 &&"
+
+    # command_list = ["ns-train regional-nerfacto"]
+    # command_list = ["ns-train gaussian-splatting"]
+    command_list = ["ns-train nerfacto"]
     # command_list = ["ns-train neus-facto"]
+    
+    command_list.append(f"--machine.num-devices 1")
     if port is not None:
         command_list.append(f"--vis viewer --viewer.websocket-port={port}")
     if num_sample is not None:
@@ -42,15 +48,15 @@ def construct_command(args):
     if checkpoint is not None:
         command_list.append(f"--load-dir {checkpoint}")
     # command_list.append(f"--pipeline.datamanager.camera-optimizer.mode {pose_optimizer}")
-    command_list.append(f"--pipeline.datamanager.camera-optimizer.mode off")
+    # command_list.append(f"--pipeline.datamanager.camera-optimizer.mode off")
     # command_list.append(f"--logging.profiler pytorch")
-    # command_list.append(f"--pipeline.datamanager.train-num-rays-per-batch {num_rays_per_batch}")
+    command_list.append(f"--pipeline.datamanager.train-num-rays-per-batch {num_rays_per_batch}")
     command_list.append(f"--logging.profiler none")
     command_list.append(f"--pipeline.model.background_color random")
     command_list.append(f"--pipeline.model.near_plane {near_plane}")
     command_list.append(f"--pipeline.model.far_plane {far_plane}")
     command = " ".join(command_list)
-    return command
+    return environment_variables + command
 
 if __name__ == '__main__':
 
