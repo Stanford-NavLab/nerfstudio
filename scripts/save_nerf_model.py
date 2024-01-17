@@ -17,7 +17,7 @@ from nerfstudio.utils.eval_utils import eval_setup
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESMoonRender/regional-nerfacto/2023-10-25_144723/config.yml'))
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESMoonRender/regional-nerfacto/2023-11-06_145111/config.yml'))
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESSanJose/regional-nerfacto/2023-11-08_100320/config.yml'))
-config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESSanJose/regional-nerfacto/2023-10-24_155331/config.yml'))
+config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESSanJose/regional-nerfacto/2023-11-15_130634/config.yml'))
 
 
 # TODO: arg: model component options
