@@ -185,12 +185,14 @@ class RNerfModel(NerfactoModel):
         xy = xy.reshape(-1, 2)
         h_xy = torch.zeros_like(xy)
         delta = 1e-4
+        height_vals_cur = self.field.positions_to_heights(xy)
         for i in range(2):
             delta_vec = torch.zeros_like(xy)
             delta_vec[:, i] = delta
             height_vals_pos = self.field.positions_to_heights(xy + delta_vec)
-            height_vals_neg = self.field.positions_to_heights(xy - delta_vec)
-            h_xy[:, i] = (height_vals_pos - height_vals_neg).reshape(-1) / (2 * delta)
+            #height_vals_neg = self.field.positions_to_heights(xy - delta_vec)
+            h_xy[:, i] = (height_vals_pos - height_vals_cur).reshape(-1) / (delta)
+            height_vals_pos.detach()
         h_xy = h_xy.reshape(*init_shape)
         
         # Outlier rejection

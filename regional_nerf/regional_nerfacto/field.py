@@ -37,7 +37,7 @@ class RNerfField(NerfactoField):
         **kwargs) -> None:
         super().__init__(**kwargs)
 
-        self.top_cutoff = -0.5
+        self.top_cutoff = 1.0
 
         self.encs = torch.nn.ModuleList(
             [

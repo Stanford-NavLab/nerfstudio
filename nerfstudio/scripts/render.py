@@ -43,6 +43,14 @@ from scipy.spatial import KDTree
 from torch import Tensor
 from typing_extensions import Annotated
 
+<<<<<<<<< Temporary merge branch 1
+from nerfstudio.cameras.camera_paths import (get_interpolated_camera_path,
+                                             get_path_from_json,
+                                             get_spiral_path)
+from nerfstudio.cameras.cameras import Cameras, CameraType
+from nerfstudio.data.datamanagers.base_datamanager import VanillaDataManager
+from nerfstudio.data.scene_box import SceneBox
+=========
 import viser.transforms as tf
 
 from nerfstudio.cameras.camera_paths import (
@@ -64,6 +72,7 @@ from nerfstudio.data.datasets.base_dataset import Dataset
 from nerfstudio.data.scene_box import OrientedBox
 from nerfstudio.data.utils.dataloaders import FixedIndicesEvalDataloader
 from nerfstudio.engine.trainer import TrainerConfig
+>>>>>>>>> Temporary merge branch 2
 from nerfstudio.model_components import renderers
 from nerfstudio.pipelines.base_pipeline import Pipeline
 from nerfstudio.utils import colormaps, install_checks
@@ -141,6 +150,7 @@ def _render_trajectory_video(
 
         writer = None
 
+<<<<<<<<< Temporary merge branch 1
         train_dataset = pipeline.datamanager.train_dataset
         train_cameras = train_dataset.cameras.to(pipeline.device)
         # train_cameras.rescale_output_resolution(float(cameras.image_width[0]/ train_cameras.image_width[0]))
@@ -153,11 +163,27 @@ def _render_trajectory_video(
         points = points.reshape(-1, 3)
 
         kdtree = KDTree(points)
+=========
+        if render_nearest_camera:
+            assert pipeline.datamanager.train_dataset is not None
+            train_dataset = pipeline.datamanager.train_dataset
+            train_cameras = train_dataset.cameras.to(pipeline.device)
+        else:
+            train_dataset = None
+            train_cameras = None
+>>>>>>>>> Temporary merge branch 2
 
         with progress:
             for camera_idx in progress.track(range(cameras.size), description=""):
                 obb_box = None
                 if crop_data is not None:
+<<<<<<<<< Temporary merge branch 1
+                    bounding_box_min = crop_data.center - crop_data.scale / 2.0
+                    bounding_box_max = crop_data.center + crop_data.scale / 2.0
+                    aabb_box = SceneBox(torch.stack([bounding_box_min, bounding_box_max]).to(pipeline.device))
+                camera_ray_bundle = cameras.generate_rays(camera_indices=camera_idx, aabb_box=aabb_box)
+                cam_pos = cameras[camera_idx].camera_to_worlds[:, 3].cpu()
+=========
                     obb_box = crop_data.obb
 
                 max_dist, max_idx = -1, -1
@@ -203,6 +229,7 @@ def _render_trajectory_video(
 
                     if max_idx == -1:
                         max_idx = true_max_idx
+>>>>>>>>> Temporary merge branch 2
 
                 if crop_data is not None:
                     with renderers.background_color_override_context(
@@ -252,6 +279,28 @@ def _render_trajectory_video(
                             .numpy()
                         )
                     render_image.append(output_image)
+<<<<<<<<< Temporary merge branch 1
+                
+                if "nearest_camera" in rendered_output_names:
+                    #Add closest training image
+                    dist, nearest_train_cam_idx = kdtree.query(cam_pos)
+                    img = train_dataset.get_image(nearest_train_cam_idx)
+                    padded_img = torch.zeros(int(cameras.image_height[0]), int(cameras.image_width[0]), 3)
+                    # Calculate the starting indices for copying the original tensor into the padded tensor.
+                    start_row = (padded_img.shape[0] - img.shape[0]) // 2
+                    start_col = (padded_img.shape[1] - img.shape[1]) // 2
+                    # Calculate the ending indices for copying the original tensor.
+                    end_row = start_row + img.shape[0]
+                    end_col = start_col + img.shape[1]
+                    # Copy the original img into the padded tensor at the appropriate position.
+                    padded_img[start_row:end_row, start_col:end_col] = img
+
+                    # train_camera_ray_bundle = train_cameras.generate_rays(camera_indices=int(nearest_train_cam_idx))
+                    # img = pipeline.model.get_outputs_for_camera_ray_bundle(train_camera_ray_bundle)['rgb']
+                    padded_img = (
+                        colormaps.apply_colormap(
+                            image=padded_img,
+=========
 
                 # Add closest training image to the right of the rendered image
                 if render_nearest_camera:
@@ -267,13 +316,19 @@ def _render_trajectory_video(
                     resized_image = (
                         colormaps.apply_colormap(
                             image=resized_image,
+>>>>>>>>> Temporary merge branch 2
                             colormap_options=colormap_options,
                         )
                         .cpu()
                         .numpy()
                     )
+<<<<<<<<< Temporary merge branch 1
+                    render_image.append(padded_img)
+                
+=========
                     render_image.append(resized_image)
 
+>>>>>>>>> Temporary merge branch 2
                 render_image = np.concatenate(render_image, axis=1)
                 if output_format == "images":
                     if image_format == "png":
