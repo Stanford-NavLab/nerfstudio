@@ -100,7 +100,8 @@ class DataProcessor(mp.Process):  # type: ignore
             ray_bundle: RayBundle = self.ray_generator(ray_indices)
             # check that GPUs are available
             if torch.cuda.is_available():
-                ray_bundle = ray_bundle.pin_memory()
+                # ray_bundle = ray_bundle.pin_memory()
+                ray_bundle = ray_bundle.to("cuda")
             while True:
                 try:
                     self.out_queue.put((ray_bundle, batch))

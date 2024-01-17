@@ -41,9 +41,11 @@ def config_parser():
     parser.add_argument("datadir", type=str, help='path to your meta')
     parser.add_argument("filename", type=str, help='file name')
     parser.add_argument("--imgdir", type=str, default='footage', help='image directory name')
-    parser.add_argument("lat", type=float, help='lat of center building')
-    parser.add_argument("lon", type=float, help='lon of center building')
-    
+    parser.add_argument("lat", type=float, help='lat of origin')
+    parser.add_argument("lon", type=float, help='lon of origin')
+    parser.add_argument("--height", type=float, default=6371106.0, help='height of origin from Earth center')
+    parser.add_argument("--scale", type=float, default=0.01, help='scale of world (aim to fit relevant region in +/- 1)')
+
     return parser
     
 
@@ -71,11 +73,10 @@ if __name__ == '__main__':
 
     # # rescale the whole range if you want
     # scale = 2**3 * np.pi / max(GES_pos.max(), -GES_pos.min())
-    scale = 1.0
     SS = np.eye(4)
-    SS[0,0] = scale
-    SS[1,1] = scale
-    SS[2,2] = scale
+    SS[0,0] = args.scale
+    SS[1,1] = args.scale
+    SS[2,2] = args.scale
 
     
     rclat, rclng = np.radians(args.lat), np.radians(args.lon) 
@@ -96,7 +97,7 @@ if __name__ == '__main__':
         pos_z = position['z']
         xyz = np.array([pos_x, pos_y, pos_z])
         [pos_e,pos_n,pos_u] = np.dot(rot_ECEF2ENUV, xyz)
-        pos_u = pos_u - 6371106 # earth radius
+        pos_u = pos_u - args.height # earth radius
 
         rotation = data['cameraFrames'][i]['rotation']
 
@@ -145,9 +146,10 @@ if __name__ == '__main__':
     out["k2"] = 0.0
     out["p1"] = 0.0
     out["p2"] = 0.0
-    out["scale"] = scale
+    out["scale"] = args.scale
     out["lat"] = args.lat
     out["lon"] = args.lon
+    out["height"] = args.height
         
     out["frames"] = frames
     # applied_transform = np.eye(4)[:3, :]

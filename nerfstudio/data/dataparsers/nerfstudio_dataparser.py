@@ -56,9 +56,9 @@ class NerfstudioDataParserConfig(DataParserConfig):
     """How much to scale the region of interest by."""
     orientation_method: Literal["pca", "up", "vertical", "none"] = "none"
     """The method to use for orientation."""
-    center_method: Literal["poses", "focus", "none"] = "poses"
+    center_method: Literal["poses", "focus", "none"] = "none"
     """The method to use to center the poses."""
-    auto_scale_poses: bool = True
+    auto_scale_poses: bool = False
     """Whether to automatically scale the poses to fit in +/- 1 bounding box."""
     eval_mode: Literal["fraction", "filename", "interval", "all"] = "fraction"
     """

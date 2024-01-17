@@ -72,6 +72,7 @@ class RNerfField(NerfactoField):
         
         tot_out_dims_2d = sum([e.n_output_dims for e in self.encs2d])
         
+        # Create a network that maps elevation z = f(x, y) for surface
         self.heightcap_net = tcnn.Network(
             n_input_dims=tot_out_dims_2d,
             n_output_dims=1,
@@ -128,10 +129,10 @@ class RNerfField(NerfactoField):
             heightcaps = 10000.0
 
         # Selector to mask out positions with z higher than heightcaps
-        selector_hardthreshold = (unnorm_positions[..., 2] <= -0.5) # Zeros out density for height above -0.5 in NeRF scale
-        selector_0 = (unnorm_positions[..., 2] <= heightcaps) # Navlab added
+        selector_0 = (unnorm_positions[..., 2] <= heightcaps)
+        # selector_0 = (unnorm_positions[..., 2] <= heightcaps) & (unnorm_positions[..., 2] >= ground_points) # Navlab added
             
-        selector = selector_hardthreshold & selector_0 & ((positions > 0.0) & (positions < 1.0)).all(dim=-1)
+        selector = selector_0 & ((positions > 0.0) & (positions < 1.0)).all(dim=-1)
 
         positions = positions * selector[..., None]
         self._sample_locations = positions
@@ -189,7 +190,7 @@ class RNerfField(NerfactoField):
 
         heightcap_pass = self.heightcap_net(x).view(*ray_samples.frustums.shape, -1)
         outputs["heightcap"] = heightcap_pass
-
+        
         return outputs
     
 

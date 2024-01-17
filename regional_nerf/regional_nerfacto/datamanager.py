@@ -124,7 +124,11 @@ class RNerfDataManager(VanillaDataManager):
             # print(url)
             # response = requests.get(url)
             tile_path = f"regional_nerf/regional_nerfacto/map_tiles/{xtile}_{ytile}.png"
-            image = Image.open(tile_path).convert("RGB")
+            
+            if osp.exists(tile_path):
+                image = Image.open(tile_path).convert("RGB")
+            else:
+                image = torch.zeros((256, 256, 3), dtype=torch.uint8)
             return image
 
         if transforms is not None:

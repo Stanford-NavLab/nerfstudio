@@ -83,7 +83,7 @@ class RNerfModel(NerfactoModel):
         self.tall_loss_factor = 0.01
         self.max_height = 1.0
         self.quantile_frac = 0.9
-
+        
     def get_outputs(self, ray_bundle: RayBundle):
         ray_samples: RaySamples
         ray_samples, weights_list, ray_samples_list = self.proposal_sampler(ray_bundle, density_fns=self.density_fns)
@@ -150,12 +150,14 @@ class RNerfModel(NerfactoModel):
         height_density, _ = self.field.get_density(ray_samples, do_heightcap=False)
         height_weights = ray_samples.get_weights(height_density.detach())
 
-        # Soft penalty for height exceeding the heightcap
+        # Soft penalty for height exceeding the heightcap: y = max(0, height - x) + (1 - quantile_frac)*x
         heightcap_penalty = torch.relu(height - heightcap_field_outputs["heightcap"]) + (1.0 - self.quantile_frac)*heightcap_field_outputs["heightcap"]
+
         outputs["height_penalty"] = torch.sum(height_weights * heightcap_penalty, dim=-2)
-
+        
+        # Hard penalty for height exceeding the camera height
         outputs["heightcap_net_output"] = torch.sum(height_weights * heightcap_field_outputs["heightcap"], dim=-2)
-
+        
         # TODO: compute Jacobian of heightnet wrt. points while retaining computational graph
         # add to outputs to use in loss function
 
@@ -190,7 +192,11 @@ class RNerfModel(NerfactoModel):
             height_vals_neg = self.field.positions_to_heights(xy - delta_vec)
             h_xy[:, i] = (height_vals_pos - height_vals_neg).reshape(-1) / (2 * delta)
         h_xy = h_xy.reshape(*init_shape)
-            
+        
+        # Outlier rejection
+        h_xy[h_xy > 1.0] = 0.0
+        h_xy[h_xy < -1.0] = 0.0   
+
             # x = positions[..., 0]
             # y = positions[..., 1]
             # print(x.requires_grad, y.requires_grad)
@@ -216,13 +222,12 @@ class RNerfModel(NerfactoModel):
         # Add height opacity loss by its average
         # TODO: NAVLAB
             loss_dict["height_opacity_loss"] = self.tall_loss_factor * outputs["height_penalty"].sum(dim=-1).nanmean()
-
+            
             # TODO: add heightnet smoothness (Jacobian) loss
             #loss_dict["height_smoothness_loss"] = 1.0 * outputs["heightnet_spatial_derivatives"].sum(dim=-1).nanmean()
             #smoothness_loss = 1.0 * outputs["heightnet_spatial_derivatives"].sum(dim=-1).nanmean()
             # smoothness_loss = 1.0 * torch.sum(torch.norm(outputs["heightnet_spatial_derivatives"][..., :2], dim=-1))
-            smoothness_loss = 0.001 * torch.nanmean(torch.square(outputs["heightnet_dx"]) + torch.square(outputs["heightnet_dy"]))
-            print("smoothness loss: ", smoothness_loss)
+            smoothness_loss = (1.0-np.exp(-self.step*1e-10)) * torch.nanmean(torch.square(outputs["heightnet_dx"]) + torch.square(outputs["heightnet_dy"]))
             loss_dict["height_smoothness_loss"] = smoothness_loss
         
         return loss_dict
