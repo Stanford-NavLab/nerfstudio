@@ -85,6 +85,9 @@ class RNerfField(NerfactoField):
             },
         )
 
+        # Create a single trainable variable to store ground height
+        self.ground_height = torch.nn.Parameter(torch.tensor(0.0))
+
     @staticmethod
     def _get_encoding(start_res, end_res, levels, indim=3, hash_size=19):
         growth = np.exp((np.log(end_res) - np.log(start_res)) / (levels - 1))
@@ -125,12 +128,14 @@ class RNerfField(NerfactoField):
             x = torch.concat(xs, dim=-1)
 
             heightcaps = self.heightcap_net(x).view(*ray_samples.frustums.shape)
+            ground_height = self.ground_height
         else:
             heightcaps = 10000.0
+            ground_height = -10000.0
 
         # Selector to mask out positions with z higher than heightcaps
-        selector_0 = (unnorm_positions[..., 2] <= heightcaps)
-        # selector_0 = (unnorm_positions[..., 2] <= heightcaps) & (unnorm_positions[..., 2] >= ground_points) # Navlab added
+        # selector_0 = (unnorm_positions[..., 2] <= heightcaps)
+        selector_0 = (unnorm_positions[..., 2] <= heightcaps) & (unnorm_positions[..., 2] >= ground_height) # Navlab added
             
         selector = selector_0 & ((positions > 0.0) & (positions < 1.0)).all(dim=-1)
 
@@ -193,6 +198,8 @@ class RNerfField(NerfactoField):
         
         return outputs
     
+    def get_ground_height(self):
+        return self.ground_height
 
     def positions_to_heights(self, positions):
         inp_shape = positions.shape

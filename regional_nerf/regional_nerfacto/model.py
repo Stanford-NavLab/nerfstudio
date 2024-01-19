@@ -83,6 +83,7 @@ class RNerfModel(NerfactoModel):
         self.tall_loss_factor = 0.01
         self.max_height = 1.0
         self.quantile_frac = 0.9
+        self.ground_forget_fac = 0.1
         
     def get_outputs(self, ray_bundle: RayBundle):
         ray_samples: RaySamples
@@ -146,14 +147,18 @@ class RNerfModel(NerfactoModel):
         
         heightcap_field_outputs = self.field.get_heightcap_outputs(ray_samples)
         height = ray_samples.frustums.get_positions()[..., 2][..., None]
+        ground_height = self.field.get_ground_height()
 
         height_density, _ = self.field.get_density(ray_samples, do_heightcap=False)
         height_weights = ray_samples.get_weights(height_density.detach())
 
         # Soft penalty for height exceeding the heightcap: y = max(0, height - x) + (1 - quantile_frac)*x
         heightcap_penalty = torch.relu(height - heightcap_field_outputs["heightcap"]) + (1.0 - self.quantile_frac)*heightcap_field_outputs["heightcap"]
+        # TODO: adjust the quantile frac such that most points below have density, but points above don't
+        ground_penalty = torch.square(ground_height - torch.min(heightcap_field_outputs["heightcap"]))
 
         outputs["height_penalty"] = torch.sum(height_weights * heightcap_penalty, dim=-2)
+        outputs["ground_penalty"] = torch.sum(height_weights * ground_penalty, dim=-2)
         
         # Hard penalty for height exceeding the camera height
         outputs["heightcap_net_output"] = torch.sum(height_weights * heightcap_field_outputs["heightcap"], dim=-2)
@@ -224,6 +229,7 @@ class RNerfModel(NerfactoModel):
         # Add height opacity loss by its average
         # TODO: NAVLAB
             loss_dict["height_opacity_loss"] = self.tall_loss_factor * outputs["height_penalty"].sum(dim=-1).nanmean()
+            loss_dict["ground_opacity_loss"] = self.tall_loss_factor * outputs["ground_penalty"].sum(dim=-1).nanmean()
             
             # TODO: add heightnet smoothness (Jacobian) loss
             #loss_dict["height_smoothness_loss"] = 1.0 * outputs["heightnet_spatial_derivatives"].sum(dim=-1).nanmean()

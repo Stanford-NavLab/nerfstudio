@@ -34,6 +34,23 @@ def pad_rot(rot):
     rot_mat[-1,-1] = 1
     return rot_mat
 
+def get_elevation_usgs(lat, lon):
+    url = 'https://epqs.nationalmap.gov/v1/json?'
+
+    params = {
+        'x': lon,
+        'y': lat, 
+        'units': 'Meters',
+        'output': 'json'
+    }
+  
+    full_url = url + urllib.parse.urlencode(params)
+    print("Querying...", full_url)
+    response = requests.get(full_url)
+    data = json.loads(response.text)
+    print("...Done")
+    return data['value']
+    
 
 def config_parser():
     import configargparse
@@ -43,8 +60,8 @@ def config_parser():
     parser.add_argument("--imgdir", type=str, default='footage', help='image directory name')
     parser.add_argument("lat", type=float, help='lat of origin')
     parser.add_argument("lon", type=float, help='lon of origin')
-    parser.add_argument("--height", type=float, default=6371106.0, help='height of origin from Earth center')
-    parser.add_argument("--scale", type=float, default=0.01, help='scale of world (aim to fit relevant region in +/- 1)')
+    parser.add_argument("--height", type=float, default=None, help='height of origin from Earth center')
+    parser.add_argument("--scale", type=float, default=0.05, help='scale of world (aim to fit relevant region in +/- 1)')
 
     return parser
     
@@ -60,6 +77,9 @@ if __name__ == '__main__':
 
     import imageio
     import numpy as np  
+
+    import requests 
+    import urllib
 
     with open(os.path.join(args.datadir, args.filename), 'r') as f:
         data = json.load(f)
@@ -89,6 +109,14 @@ if __name__ == '__main__':
     
     image_list = np.sort(os.listdir(os.path.join(args.datadir, args.imgdir)))
     
+    if args.height is None:
+        # TODO: find a better way to find the distance of earth surface from center of the earth
+        val = get_elevation_usgs(args.lat, args.lon)
+        # val = 0.0
+        height = float(val) + 6371e3 # min earth radius
+    else:
+        height = args.height 
+
     print("Found entries...", len(data['cameraFrames']))
     for i in range(len(data['cameraFrames'])):
         position = data['cameraFrames'][i]['position']
@@ -97,7 +125,8 @@ if __name__ == '__main__':
         pos_z = position['z']
         xyz = np.array([pos_x, pos_y, pos_z])
         [pos_e,pos_n,pos_u] = np.dot(rot_ECEF2ENUV, xyz)
-        pos_u = pos_u - args.height # earth radius
+        pos_u = pos_u - height 
+        assert pos_u >= 0
 
         rotation = data['cameraFrames'][i]['rotation']
 
@@ -149,7 +178,7 @@ if __name__ == '__main__':
     out["scale"] = args.scale
     out["lat"] = args.lat
     out["lon"] = args.lon
-    out["height"] = args.height
+    out["height"] = height
         
     out["frames"] = frames
     # applied_transform = np.eye(4)[:3, :]
