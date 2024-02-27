@@ -18,6 +18,8 @@ from pathlib import Path
 import numpy as np
 import math
 
+from minimal_regional_nerfacto.utils.geodetic_utils import get_elevation_usgs
+
 
 @dataclass
 class MRNerfDataManagerConfig(VanillaDataManagerConfig):
@@ -163,4 +165,6 @@ class MRNerfDataManager(VanillaDataManager):
         self.enu2nerf_points = enu2nerf_points
         self.nerf2enu_points = nerf2enu_points
         self.center_latlon = [meta["lat"], meta["lon"]]
+
+        self.center_usgs_height = float(get_elevation_usgs(*self.center_latlon))
         

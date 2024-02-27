@@ -40,6 +40,7 @@ def get_elevation_usgs(lat, lon):
         print(data['message'])
         raise ValueError
     return data['value']
+
 def enu_to_ecef_rotation(lat, lon):
     # Compute rotation matrix from ENU to ECEF
     lat_rad = np.radians(lat)

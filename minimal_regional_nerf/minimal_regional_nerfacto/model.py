@@ -7,6 +7,9 @@ import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Type
 
+# Geospatial conversions
+import pymap3d as pm
+
 import nerfacc
 import numpy as np
 import torch
@@ -99,12 +102,21 @@ class MRNerfModel(NerfactoModel):
                 lon = float(latlon_separated[1])
                 rclat = self.field.center_latlon[0]
                 rclon = self.field.center_latlon[1]
+                rcalt = self.field.center_usgs_height
 
-                # Convert latlon into ENU
-                r_earth = 6378137.0 # (m)
-                east, north, up = geodetic_to_enu(lat, lon, r_earth, rclat, rclon, r_earth)
-                # Convert to (1x3) tensor
-                enu = torch.tensor([east, north, up])[None, :].to(self.device)
+                # OLD VERSION
+                # # Convert latlon into ENU
+                # r_earth = 6378137.0 # (m)
+                # east, north, up = geodetic_to_enu(lat, lon, r_earth, rclat, rclon, r_earth)
+                # # Convert to (1x3) tensor
+                # enu = torch.tensor([east, north, up])[None, :].to(self.device)
+                # # Convert ENU into NeRF coordinates
+                # self.nerf_from_enu_coords = self.field.enu2nerf_points(enu).reshape(-1)
+
+                # NEW VERSION
+                # Convert latlon into ENU as a (1x3) torch tensor
+                enu = torch.tensor(pm.geodetic2enu(lat, lon, rcalt, 
+                                                   rclat, rclon, rcalt)).float().view(1, 3).to(self.device)
                 # Convert ENU into NeRF coordinates
                 self.nerf_from_enu_coords = self.field.enu2nerf_points(enu).reshape(-1)
 
@@ -112,7 +124,7 @@ class MRNerfModel(NerfactoModel):
                 print("Query Point lat, lon: ", lat, lon)
                 print("NeRF Center lat, lon: ", rclat, rclon)
 
-                print("ENU (m)   : ", east, north, up)
+                print("ENU (m)   : ", enu)
                 print("NeRF coord: ", self.nerf_from_enu_coords)
                 
     

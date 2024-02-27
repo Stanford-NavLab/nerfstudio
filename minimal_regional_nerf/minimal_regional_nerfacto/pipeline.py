@@ -76,7 +76,8 @@ class MRNerfPipeline(VanillaPipeline):
             nerf2enu=self.datamanager.nerf2enu, 
             enu2nerf_points=self.datamanager.enu2nerf_points, 
             nerf2enu_points=self.datamanager.nerf2enu_points,  
-            center_latlon=self.datamanager.center_latlon
+            center_latlon=self.datamanager.center_latlon,
+            center_usgs_height=self.datamanager.center_usgs_height
             )
         self.model.to(device)
 

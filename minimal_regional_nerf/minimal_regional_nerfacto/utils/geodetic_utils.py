@@ -1,5 +1,31 @@
 from math import radians, cos, sin, sqrt, atan2
 
+import requests 
+import urllib
+import json
+
+
+def get_elevation_usgs(lat, lon):
+    url = 'https://epqs.nationalmap.gov/v1/json?'
+
+    params = {
+        'x': lon,
+        'y': lat, 
+        'units': 'Meters',
+        'output': 'json'
+    }
+  
+    full_url = url + urllib.parse.urlencode(params)
+    print("Querying...", full_url)
+    response = requests.get(full_url)
+    data = json.loads(response.text)
+    print("...Done")
+    if 'value' not in data.keys():
+        print(data['message'])
+        raise ValueError
+    return data['value']
+
+
 def geodetic_to_enu(lat_q, lon_q, h_q, lat_c, lon_c, h_c):
     """
     Convert geodetic coordinates to East-North-Up (ENU) coordinates.
