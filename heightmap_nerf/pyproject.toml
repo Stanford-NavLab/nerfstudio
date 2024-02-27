@@ -1,0 +1,13 @@
+[project]
+name = "heightcap-nerf-methods"
+description = "NeRF models with a 2.5D height representation"
+version = "0.1.0"
+
+dependencies = ["nerfstudio >= 0.3.0"] 
+
+[tool.setuptools.packages.find]
+include = ["heightcap_nerfacto*"]
+
+# register the entry point of your new method here:
+[project.entry-points.'nerfstudio.method_configs']
+heightcap-nerfacto = 'heightcap_nerfacto.config:heightcap_nerfacto'

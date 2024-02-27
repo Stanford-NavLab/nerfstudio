@@ -49,6 +49,9 @@ def get_elevation_usgs(lat, lon):
     response = requests.get(full_url)
     data = json.loads(response.text)
     print("...Done")
+    if 'value' not in data.keys():
+        print(data['message'])
+        raise ValueError
     return data['value']
     
 
@@ -58,11 +61,12 @@ def config_parser():
     parser.add_argument("datadir", type=str, help='path to your meta')
     parser.add_argument("filename", type=str, help='file name')
     parser.add_argument("--imgdir", type=str, default='footage', help='image directory name')
-    parser.add_argument("lat", type=float, help='lat of origin')
-    parser.add_argument("lon", type=float, help='lon of origin')
+    parser.add_argument("--center", type=bool, default=False, help='set to True if you want to compute center of the camera poses and use it as origin')
+    parser.add_argument("--lat", type=float, default=None, help='lat of origin')
+    parser.add_argument("--lon", type=float, default=None, help='lon of origin')
     parser.add_argument("--height", type=float, default=None, help='height of origin from Earth center')
-    parser.add_argument("--scale", type=float, default=0.05, help='scale of world (aim to fit relevant region in +/- 1)')
-
+    parser.add_argument("--scale", type=float, default=0.01, help='scale of world (aim to fit relevant region in +/- 1)')
+    parser.add_argument("--compatibility", type=str, default="v2", help='set to v1 if using older datasets')
     return parser
     
 
@@ -98,7 +102,24 @@ if __name__ == '__main__':
     SS[1,1] = args.scale
     SS[2,2] = args.scale
 
+    if args.center:
+        print("Computing center of the camera poses...")
+        lats = []
+        lons = []
+        alts = []
+        for i in range(len(data['cameraFrames'])):
+            coordinate = data['cameraFrames'][i]['coordinate']
+            lats.append(coordinate['latitude'])
+            lons.append(coordinate['longitude'])
+            alts.append(coordinate['altitude'])
+        args.lat = np.mean(lats)
+        args.lon = np.mean(lons)
+        # args.height = np.mean(alts)
+        print("...Done")
     
+    if args.lat is None or args.lon is None:
+        raise ValueError("Please provide lat and lon of the origin or set center to True")
+
     rclat, rclng = np.radians(args.lat), np.radians(args.lon) 
     rot_ECEF2ENUV = np.array([[-math.sin(rclng),                math.cos(rclng),                              0],
                               [-math.sin(rclat)*math.cos(rclng), -math.sin(rclat)*math.sin(rclng), math.cos(rclat)],
@@ -115,7 +136,7 @@ if __name__ == '__main__':
         # val = 0.0
         height = float(val) + 6371e3 # min earth radius
     else:
-        height = args.height 
+        height = args.height + 6371e3
 
     print("Found entries...", len(data['cameraFrames']))
     for i in range(len(data['cameraFrames'])):
@@ -145,7 +166,10 @@ if __name__ == '__main__':
 
         c2w = np.concatenate([GES_rotmat[:3,:4], np.array([[0, 0, 0, 1]])], 0)
 
-        img_name_i = image_list[0][:-9] + '_' + str(i).zfill(3) + '.jpeg'
+        if args.compatibility=="v1":
+            img_name_i = image_list[0][:-10] + '_' + str(i).zfill(4) + '.jpeg'
+        else:
+            img_name_i = image_list[0][:-9] + '_' + str(i).zfill(3) + '.jpeg'
         img_path = os.path.join(args.imgdir, img_name_i)
         if img_name_i not in image_list:
             print("Image not found, skipping...", img_path)

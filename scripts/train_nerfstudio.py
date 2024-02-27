@@ -5,6 +5,7 @@ def config_parser():
     parser.add_argument("--checkpoint", type=str, default=None, help='path to checkpoint directory (E.g. outputs/<dataset>/nerfacto/<date>/nerfstudio_models/)')
     parser.add_argument("--port", type=int, default=51224, help='port')
     parser.add_argument("--num_sample", type=int, default=600, help='Number of training images to sample from')
+    parser.add_argument("--num_sample_eval", type=int, default=10, help='Number of eval images to sample from')
     parser.add_argument("--num_rays_per_batch", type=int, default=256, help='Number of rays per batch')
     parser.add_argument("--save_latest", type=bool, default=True, help='Save only the latest checkpoint')
     parser.add_argument("--downscale_factor", type=float, default=None, help='Downscale factor')
@@ -40,6 +41,8 @@ def construct_command(args):
         command_list.append(f"--vis viewer --viewer.websocket-port={port}")
     if num_sample is not None:
         command_list.append(f"--pipeline.datamanager.train-num-images-to-sample-from {num_sample}")
+        command_list.append(f"--pipeline.datamanager.eval-num-images-to-sample-from {args.num_sample_eval}")
+        command_list.append(f"--steps-per-eval-batch 20000 --steps-per-eval-image 20000")
     command_list.append(f"--data {data_folder}")
     if save_latest is not None:
         command_list.append(f"--save-only-latest-checkpoint {save_latest}")

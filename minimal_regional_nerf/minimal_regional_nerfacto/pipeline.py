@@ -1,5 +1,5 @@
 """
-Nerfstudio RNerf Pipeline
+Nerfstudio MRNerf Pipeline
 """
 
 import typing
@@ -10,8 +10,8 @@ import torch.distributed as dist
 from torch.cuda.amp.grad_scaler import GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from regional_nerfacto.datamanager import RNerfDataManagerConfig
-from regional_nerfacto.model import RNerfModel, RNerfModelConfig
+from minimal_regional_nerfacto.datamanager import MRNerfDataManagerConfig
+from minimal_regional_nerfacto.model import MRNerfModel, MRNerfModelConfig
 from nerfstudio.data.datamanagers.base_datamanager import (
     DataManager,
     DataManagerConfig,
@@ -24,19 +24,19 @@ from nerfstudio.pipelines.base_pipeline import (
 
 
 @dataclass
-class RNerfPipelineConfig(VanillaPipelineConfig):
+class MRNerfPipelineConfig(VanillaPipelineConfig):
     """Configuration for pipeline instantiation"""
 
-    _target: Type = field(default_factory=lambda: RNerfPipeline)
+    _target: Type = field(default_factory=lambda: MRNerfPipeline)
     """target class to instantiate"""
-    datamanager: DataManagerConfig = RNerfDataManagerConfig()
+    datamanager: DataManagerConfig = MRNerfDataManagerConfig()
     """specifies the datamanager config"""
-    model: ModelConfig = RNerfModelConfig()
+    model: ModelConfig = MRNerfModelConfig()
     """specifies the model config"""
 
 
-class RNerfPipeline(VanillaPipeline):
-    """RNerf Pipeline
+class MRNerfPipeline(VanillaPipeline):
+    """MRNerf Pipeline
 
     Args:
         config: the pipeline config used to instantiate class
@@ -44,7 +44,7 @@ class RNerfPipeline(VanillaPipeline):
 
     def __init__(
         self,
-        config: RNerfPipelineConfig,
+        config: MRNerfPipelineConfig,
         device: str,
         test_mode: Literal["test", "val", "inference"] = "val",
         world_size: int = 1,
@@ -67,13 +67,15 @@ class RNerfPipeline(VanillaPipeline):
             device=device,
             grad_scaler=grad_scaler,
         )
+
+        ######################
+        # Minimal Regional Nerf Specific
+        ######################
         self.model.set_enu_transform(
             enu2nerf=self.datamanager.enu2nerf, 
             nerf2enu=self.datamanager.nerf2enu, 
             enu2nerf_points=self.datamanager.enu2nerf_points, 
-            nerf2enu_points=self.datamanager.nerf2enu_points, 
-            osm_image=self.datamanager.osm_image, 
-            osm_scale=self.datamanager.osm_scale, 
+            nerf2enu_points=self.datamanager.nerf2enu_points,  
             center_latlon=self.datamanager.center_latlon
             )
         self.model.to(device)
@@ -81,6 +83,6 @@ class RNerfPipeline(VanillaPipeline):
         self.world_size = world_size
         if world_size > 1:
             self._model = typing.cast(
-                RNerfModel, DDP(self._model, device_ids=[local_rank], find_unused_parameters=True)
+                MRNerfModel, DDP(self._model, device_ids=[local_rank], find_unused_parameters=True)
             )
             dist.barrier(device_ids=[local_rank])
