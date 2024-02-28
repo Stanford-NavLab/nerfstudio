@@ -98,8 +98,8 @@ def get_path_from_json(pipeline, camera_path: Dict[str, Any]) -> Cameras:
     else:
         camera_type = CameraType.PERSPECTIVE
 
-    print("==================")
-    print(f"Camera Type set to {camera_type}")
+    print("========= [Render Poses] =========")
+    print(f"[Render Poses] Camera Type set to {camera_type}")
 
     c2ws = []
     fxs = []
@@ -200,7 +200,13 @@ class RenderCameraPose(BaseRender):
         print("[Render Poses] ...Done")
 
         print("[Render Poses] Printing self")
-        print(self)
+        print(self.nice_self_json())
+
+        print("[Render Poses] Saving params")
+        self.save_params_to_json()
+        # Also copy the current JSON
+        dst = os.path.join(self.output_path, "camera_path.json")
+        shutil.copyfile(self.camera_path_filename, dst)
 
         # Note: If there is something that is not currently being passed, 
         # it will not be used. :) Just a heads up :)
@@ -214,6 +220,38 @@ class RenderCameraPose(BaseRender):
             depth_far_plane = self.depth_far_plane,
             colormap_options = self.colormap_options
             )
+
+    def nice_self_dict(self):
+        """Take the class variables and convert to dictionary."""
+        dict_str = {}
+
+        # Needed since PosixPath cannot be directly converted to JSON
+        for key, val in vars(self).items():
+            if isinstance(val, (int, float)):
+                dict_str[key] = val
+            else:
+                dict_str[key] = str(val)
+        
+        return dict_str
+    
+    def nice_self_json(self):
+        """Take the above dictionary and convert to JSON."""
+        return json.dumps(self.nice_self_dict(), indent=4)
+    
+    def save_params_to_json(self):
+        """Save the above function to a file"""
+        if self.output_path is None:
+            print("Could not save params file, output path is None.")
+        else:
+            json_to_save = self.nice_self_dict()
+            file_out_name = os.path.join(self.output_path, 'render_poses_params.json')
+
+            # Make directories, if needed
+            os.makedirs(os.path.dirname(file_out_name), exist_ok=True)
+            # Then write the file
+            with open(file_out_name, 'w', encoding="utf-8") as f: 
+                json.dump(json_to_save, f, indent=4)
+
 
 Commands = tyro.conf.FlagConversionOff[
     Union[
