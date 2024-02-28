@@ -209,12 +209,12 @@ class RenderCameraPose(BaseRender):
             curr_date_time_str = curr_date_time.strftime('%Y-%m-%d-%H-%M-%S')
 
             # To make it more human readable,
-            adj_list = ["happy", "significant", "relative", "cheerful",
+            adj_list = ["happy", "significant", "relativistic", "cheerful",
                         "continuous", "certain", "thoughtful", "powerful"]
             color_list = ["red", "orange", "yellow", "green",
-                        "blue", "indigo", "violet", "pink"]
+                          "blue", "indigo", "violet", "pink"]
             animal_list = ["panda", "bison", "cheetah", "toucan",
-                        "dog", "cat", "tiger", "giraffe"]
+                           "monkey", "antelope", "tiger", "giraffe"]
             suffix = random.choice(adj_list) + "_" + random.choice(color_list) + "_" + \
                         random.choice(animal_list)
             save_folder_out = curr_date_time_str + "_" + suffix + "/"
@@ -277,6 +277,7 @@ class RenderCameraPose(BaseRender):
             # Then write the file
             with open(file_out_name, 'w', encoding="utf-8") as f: 
                 json.dump(json_to_save, f, indent=4)
+                f.write("\n") # Add a newline at the very end
 
 
 Commands = tyro.conf.FlagConversionOff[
