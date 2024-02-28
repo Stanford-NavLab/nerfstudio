@@ -55,8 +55,11 @@ class MRNerfDataManager(VanillaDataManager):
 
         self.create_enu_mapping()
 
-        images = [self.train_dataset[i]["image"].permute(2, 0, 1)[None, ...] for i in range(len(self.train_dataset))]
-        images = torch.cat(images)
+        # images = [self.train_dataset[i]["image"].permute(2, 0, 1)[None, ...] for i in range(len(self.train_dataset))]
+        # images = torch.cat(images)
+        print("--------------------------------")
+        print("[Data Manager] Finished ENU Mappings")
+        # print(f"[Data Manager] len training dataset was: {len(self.train_dataset)}")
 
     def _find_transform(self, image_path: Path) -> Union[Path, None]:
         while image_path.parent != image_path:
@@ -169,6 +172,6 @@ class MRNerfDataManager(VanillaDataManager):
         self.center_height = float(get_elevation(*self.center_latlon))
 
         print("--------------------------------")
-        print("Finished Data Manager")
+        print("[Data Manager] Finished ENU Mappings")
 
         

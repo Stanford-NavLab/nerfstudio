@@ -51,13 +51,24 @@ class MRNerfPipeline(VanillaPipeline):
         local_rank: int = 0,
         grad_scaler: Optional[GradScaler] = None,
     ):
+        print("---------------------------")
+        print("STARTING SUPER INIT PIPELINE")
         super(VanillaPipeline, self).__init__()
         self.config = config
         self.test_mode = test_mode
+
+        print("---------------------------")
+        print("[Pipeline] Setting up datamanager")
         self.datamanager: DataManager = config.datamanager.setup(
             device=device, test_mode=test_mode, world_size=world_size, local_rank=local_rank
         )
+        print("----------------------------------------------------")
+        print("[Pipeline] Sending data manager to GPU")
+        # print(self.datamanager)
         self.datamanager.to(device)
+        print("----------------------------------------------------")
+        print(f"[Pipeline] Data manager that is on GPU: {device}")
+        # print(self.datamanager)
 
         assert self.datamanager.train_dataset is not None, "Missing input dataset"
         self._model = config.model.setup(
@@ -71,6 +82,8 @@ class MRNerfPipeline(VanillaPipeline):
         ######################
         # Minimal Regional Nerf Specific
         ######################
+        print("----------------------------------------------------")
+        print("[Pipeline] Setting ENU transforms")
         self.model.set_enu_transform(
             enu2nerf=self.datamanager.enu2nerf, 
             nerf2enu=self.datamanager.nerf2enu, 
@@ -79,11 +92,14 @@ class MRNerfPipeline(VanillaPipeline):
             center_latlon=self.datamanager.center_latlon,
             center_height=self.datamanager.center_height
             )
+        print("----------------------------------------------------")
+        print("[Pipeline] Sending model to GPU")
+        # print(self.model)
         self.model.to(device)
         # Print the model to check
         print("----------------------------------------------------")
-        print("Printing Model in Pipeline")
-        print(self.model)
+        print(f"[Pipeline] Model is on GPU: {device}")
+        # print(self.model)
 
         self.world_size = world_size
         if world_size > 1:

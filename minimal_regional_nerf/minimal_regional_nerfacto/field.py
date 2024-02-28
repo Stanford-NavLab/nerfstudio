@@ -30,6 +30,8 @@ class MRNerfField(NerfactoField):
         grid_layers,
         grid_sizes,
         **kwargs) -> None:
+        print("---------------------------")
+        print("STARTING SUPER INIT FIELD")
         super().__init__(**kwargs)
 
         self.top_cutoff = 1.0
