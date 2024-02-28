@@ -21,6 +21,10 @@ import urllib
 import tyro
 from typing_extensions import Annotated
 
+# For folder names
+from datetime import datetime
+import random
+
 from minimal_regional_nerfacto.utils.geodetic_utils import get_elevation
 
 # def get_elevation_usgs(lat, lon):
@@ -199,13 +203,35 @@ class RenderCameraPose(BaseRender):
         cameras = get_path_from_json(pipeline, camera_path)
         print("[Render Poses] ...Done")
 
+        # Generate a save path that will not conflict with multiple runs
+        if self.output_path is not None:
+            curr_date_time = datetime.now()
+            curr_date_time_str = curr_date_time.strftime('%Y-%m-%d-%H-%M-%S')
+
+            # To make it more human readable,
+            adj_list = ["happy", "significant", "relative", "cheerful",
+                        "continuous", "certain", "thoughtful", "powerful"]
+            color_list = ["red", "orange", "yellow", "green",
+                        "blue", "indigo", "violet", "pink"]
+            animal_list = ["panda", "bison", "cheetah", "toucan",
+                        "dog", "cat", "tiger", "giraffe"]
+            suffix = random.choice(adj_list) + "_" + random.choice(color_list) + "_" + \
+                        random.choice(animal_list)
+            save_folder_out = curr_date_time_str + "_" + suffix + "/"
+            self.safe_output_path = Path(self.output_path, save_folder_out)
+        else:
+            self.safe_output_path = self.output_path
+
+        print(f"[Render Poses] Will save to {self.safe_output_path}")
+        print(f"Original path was {self.output_path}")
+
         print("[Render Poses] Printing self")
         print(self.nice_self_json())
 
         print("[Render Poses] Saving params")
         self.save_params_to_json()
         # Also copy the current JSON
-        dst = os.path.join(self.output_path, "camera_path.json")
+        dst = Path(self.safe_output_path, "camera_path.json")
         shutil.copyfile(self.camera_path_filename, dst)
 
         # Note: If there is something that is not currently being passed, 
@@ -213,7 +239,7 @@ class RenderCameraPose(BaseRender):
         _render_trajectory_video(
             pipeline=pipeline, 
             cameras=cameras, 
-            output_filename=self.output_path,
+            output_filename=self.safe_output_path,
             rendered_output_names=self.rendered_output_names,
             output_format = self.output_format,
             depth_near_plane = self.depth_near_plane,
@@ -240,11 +266,11 @@ class RenderCameraPose(BaseRender):
     
     def save_params_to_json(self):
         """Save the above function to a file"""
-        if self.output_path is None:
+        if self.safe_output_path is None:
             print("Could not save params file, output path is None.")
         else:
             json_to_save = self.nice_self_dict()
-            file_out_name = os.path.join(self.output_path, 'render_poses_params.json')
+            file_out_name = os.path.join(self.safe_output_path, 'render_poses_params.json')
 
             # Make directories, if needed
             os.makedirs(os.path.dirname(file_out_name), exist_ok=True)
