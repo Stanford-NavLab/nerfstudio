@@ -21,25 +21,27 @@ import urllib
 import tyro
 from typing_extensions import Annotated
 
-def get_elevation_usgs(lat, lon):
-    url = 'https://epqs.nationalmap.gov/v1/json?'
+from minimal_regional_nerfacto.utils.geodetic_utils import get_elevation
 
-    params = {
-        'x': lon,
-        'y': lat, 
-        'units': 'Meters',
-        'output': 'json'
-    }
+# def get_elevation_usgs(lat, lon):
+#     url = 'https://epqs.nationalmap.gov/v1/json?'
+
+#     params = {
+#         'x': lon,
+#         'y': lat, 
+#         'units': 'Meters',
+#         'output': 'json'
+#     }
   
-    full_url = url + urllib.parse.urlencode(params)
-    print("Querying...", full_url)
-    response = requests.get(full_url)
-    data = json.loads(response.text)
-    print("...Done")
-    if 'value' not in data.keys():
-        print(data['message'])
-        raise ValueError
-    return data['value']
+#     full_url = url + urllib.parse.urlencode(params)
+#     print("Querying...", full_url)
+#     response = requests.get(full_url)
+#     data = json.loads(response.text)
+#     print("...Done")
+#     if 'value' not in data.keys():
+#         print(data['message'])
+#         raise ValueError
+#     return data['value']
 
 def enu_to_ecef_rotation(lat, lon):
     # Compute rotation matrix from ENU to ECEF
@@ -80,7 +82,7 @@ def get_path_from_json(pipeline, camera_path: Dict[str, Any]) -> Cameras:
 
     # central lat/lon for NeRF
     ll_center_nerf = pipeline.datamanager.center_latlon
-    height_center_nerf = float(get_elevation_usgs(ll_center_nerf[0], ll_center_nerf[1]))
+    height_center_nerf = float(get_elevation(ll_center_nerf[0], ll_center_nerf[1]))
     R_ecef2enu = enu_to_ecef_rotation(ll_center_nerf[0], ll_center_nerf[1]).float().T
 
     if "camera_type" not in camera_path:

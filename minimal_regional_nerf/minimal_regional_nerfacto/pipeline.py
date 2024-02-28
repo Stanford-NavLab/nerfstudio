@@ -77,9 +77,13 @@ class MRNerfPipeline(VanillaPipeline):
             enu2nerf_points=self.datamanager.enu2nerf_points, 
             nerf2enu_points=self.datamanager.nerf2enu_points,  
             center_latlon=self.datamanager.center_latlon,
-            center_usgs_height=self.datamanager.center_usgs_height
+            center_height=self.datamanager.center_height
             )
         self.model.to(device)
+        # Print the model to check
+        print("----------------------------------------------------")
+        print("Printing Model in Pipeline")
+        print(self.model)
 
         self.world_size = world_size
         if world_size > 1:

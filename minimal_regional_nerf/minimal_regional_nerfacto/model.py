@@ -102,7 +102,7 @@ class MRNerfModel(NerfactoModel):
                 lon = float(latlon_separated[1])
                 rclat = self.field.center_latlon[0]
                 rclon = self.field.center_latlon[1]
-                rcalt = self.field.center_usgs_height
+                rcalt = self.field.center_height
 
                 # OLD VERSION
                 # # Convert latlon into ENU
@@ -121,8 +121,8 @@ class MRNerfModel(NerfactoModel):
                 self.nerf_from_enu_coords = self.field.enu2nerf_points(enu).reshape(-1)
 
                 # Print everything
-                print("Query Point lat, lon: ", lat, lon)
-                print("NeRF Center lat, lon: ", rclat, rclon)
+                print("Query Point lat, lon, alt: ", lat, lon, rcalt)
+                print("NeRF Center lat, lon, alt: ", rclat, rclon, rcalt)
 
                 print("ENU (m)   : ", enu)
                 print("NeRF coord: ", self.nerf_from_enu_coords)
