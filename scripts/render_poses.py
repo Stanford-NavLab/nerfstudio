@@ -98,6 +98,9 @@ def get_path_from_json(pipeline, camera_path: Dict[str, Any]) -> Cameras:
     else:
         camera_type = CameraType.PERSPECTIVE
 
+    print("==================")
+    print(f"Camera Type set to {camera_type}")
+
     c2ws = []
     fxs = []
     fys = []
@@ -181,27 +184,35 @@ class RenderCameraPose(BaseRender):
 
     def main(self) -> None:
         """Main function."""
-        print("Setting up pipeline...")
+        print("[Render Poses] Setting up pipeline...")
         _, pipeline, _, _ = eval_setup(
             self.load_config,
             eval_num_rays_per_chunk=self.eval_num_rays_per_chunk,
             test_mode="inference",
         )
-        print("...Done")
+        print("[Render Poses] ...Setting up pipeline done")
 
         with open(self.camera_path_filename, "r", encoding="utf-8") as f:
             camera_path = json.load(f)
         
-        print("Computing Cameras...")
+        print("[Render Poses] Computing Cameras...")
         cameras = get_path_from_json(pipeline, camera_path)
-        print("...Done")
+        print("[Render Poses] ...Done")
 
+        print("[Render Poses] Printing self")
+        print(self)
+
+        # Note: If there is something that is not currently being passed, 
+        # it will not be used. :) Just a heads up :)
         _render_trajectory_video(
             pipeline=pipeline, 
             cameras=cameras, 
             output_filename=self.output_path,
             rendered_output_names=self.rendered_output_names,
-            output_format = self.output_format
+            output_format = self.output_format,
+            depth_near_plane = self.depth_near_plane,
+            depth_far_plane = self.depth_far_plane,
+            colormap_options = self.colormap_options
             )
 
 Commands = tyro.conf.FlagConversionOff[
