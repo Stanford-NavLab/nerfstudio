@@ -54,11 +54,11 @@ class NerfstudioDataParserConfig(DataParserConfig):
     """How much to downscale images. If not set, images are chosen such that the max dimension is <1600px."""
     scene_scale: float = 1.0
     """How much to scale the region of interest by."""
-    orientation_method: Literal["pca", "up", "vertical", "none"] = "none"
+    orientation_method: Literal["pca", "up", "vertical", "none"] = "none"   # NOTE: "up" by default, "none" for custom
     """The method to use for orientation."""
-    center_method: Literal["poses", "focus", "none"] = "none"  # NOTE: "poses" by default
+    center_method: Literal["poses", "focus", "none"] = "none"               # NOTE: "poses" by default, "none" for custom
     """The method to use to center the poses."""
-    auto_scale_poses: bool = False
+    auto_scale_poses: bool = False                                          # NOTE: True by default, False for custom
     """Whether to automatically scale the poses to fit in +/- 1 bounding box."""
     eval_mode: Literal["fraction", "filename", "interval", "all"] = "fraction"
     """
