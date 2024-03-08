@@ -1,12 +1,12 @@
 """
-Minimal Regional Nerfacto Config
+Shadow Regional Nerfacto Config
 """
 
 from __future__ import annotations
 
-from minimal_regional_nerfacto.model import MRNerfModelConfig
-from minimal_regional_nerfacto.datamanager import MRNerfDataManagerConfig
-from minimal_regional_nerfacto.pipeline import MRNerfPipelineConfig
+from shadow_regional_nerfacto.model import SRNerfModelConfig
+from shadow_regional_nerfacto.datamanager import SRNerfDataManagerConfig
+from shadow_regional_nerfacto.pipeline import SRNerfPipelineConfig
 
 from nerfstudio.configs.base_config import ViewerConfig
 from nerfstudio.data.dataparsers.nerfstudio_dataparser import NerfstudioDataParserConfig
@@ -21,15 +21,15 @@ from nerfstudio.engine.trainer import TrainerConfig
 from nerfstudio.plugins.types import MethodSpecification
 
 
-minimal_regional_nerfacto = MethodSpecification(
+shadow_regional_nerfacto = MethodSpecification(
     config=TrainerConfig(
-        method_name="minimal-regional-nerfacto",
+        method_name="shadow-regional-nerfacto",
         steps_per_eval_batch=500,
         steps_per_save=2000,
         max_num_iterations=30000,
         mixed_precision=True,
-        pipeline=MRNerfPipelineConfig(
-        datamanager=MRNerfDataManagerConfig(
+        pipeline=SRNerfPipelineConfig(
+        datamanager=SRNerfDataManagerConfig(
             dataparser=NerfstudioDataParserConfig(train_split_fraction=0.99),
             train_num_rays_per_batch=4096,
             eval_num_rays_per_batch=4096,
@@ -39,7 +39,7 @@ minimal_regional_nerfacto = MethodSpecification(
                 scheduler=ExponentialDecaySchedulerConfig(lr_final=6e-6, max_steps=200000),
             ),
         ),
-            model=MRNerfModelConfig(
+            model=SRNerfModelConfig(
                 eval_num_rays_per_chunk=1 << 15,
                 hashgrid_sizes=(19,),
                 hashgrid_layers=(16,),
