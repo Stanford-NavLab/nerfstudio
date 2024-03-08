@@ -123,4 +123,7 @@
   "python.analysis.typeCheckingMode": "basic",
   "python.analysis.diagnosticMode": "workspace",
   "eslint.packageManager": "yarn",
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
 }

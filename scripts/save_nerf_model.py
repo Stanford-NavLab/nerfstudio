@@ -12,30 +12,33 @@ import torch
 
 from nerfstudio.utils.eval_utils import eval_setup
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 # TODO: argparser: config.yml path
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/MoonTestScenario/regional-nerfacto/2023-10-13_135547/config.yml'))
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESMoonRender/regional-nerfacto/2023-10-25_144723/config.yml'))
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESMoonRender/regional-nerfacto/2023-11-06_145111/config.yml'))
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESSanJose/regional-nerfacto/2023-11-08_100320/config.yml'))
-config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESSanJose/regional-nerfacto/2023-11-15_130634/config.yml'))
+config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/RedRocks/terrain-nerfacto/2024-03-07_145438/config.yml'))
 
 
 # TODO: arg: model component options
 
 # TODO: arg: save path
 
-# torch.save(pipeline.model.field.heightcap_net.state_dict(), 'san_jose_heightcap_net.pth')
+# torch.save(pipeline.model.field.height_net.state_dict(), 'red_rocks_height_net.pth')
 # print("saved model")
 
-# print(pipeline.model)
+# print("Ground height: ", pipeline.model.field.ground_height)
 
 # %% --------------------- Sample heights --------------------- %% #
 
 # Random Nx3 values
 N = 512
 XY_grid = torch.meshgrid(
-    torch.linspace(-2, 2, N),
-    torch.linspace(-2, 2, N),
+    torch.linspace(-2, 2, N, device=device),
+    torch.linspace(-2, 2, N, device=device),
+    indexing='xy'
 )
 XY_grid = torch.stack(XY_grid, dim=-1)
 positions = XY_grid.reshape(-1, 2)
@@ -55,27 +58,27 @@ fig = go.Figure(data=[go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(si
 fig.update_layout(title='Elevation Model', width=1500, height=800)
 fig.update_layout(scene_aspectmode='data')
 fig.show()
-fig.write_html("ges_moon_heightcap_net.html")
+#fig.write_html("ges_moon_heightcap_net.html")
 
 
 # %% ------------------ Test computing spatial derivatives ------------------ %% #
 
-def gradient(y, x, grad_outputs=None):
-    if grad_outputs is None:
-        grad_outputs = torch.ones_like(y)
-    grad = torch.autograd.grad(y, [x], grad_outputs=grad_outputs, create_graph=True)[0]
-    return grad
+# def gradient(y, x, grad_outputs=None):
+#     if grad_outputs is None:
+#         grad_outputs = torch.ones_like(y)
+#     grad = torch.autograd.grad(y, [x], grad_outputs=grad_outputs, create_graph=True)[0]
+#     return grad
 
-x = torch.tensor([0.1, 0.2], dtype=torch.float32, requires_grad=True)
-y = torch.tensor([0.0, 0.1], dtype=torch.float32, requires_grad=True)
-positions = torch.stack([x, y], dim=1)
-#positions = torch.cat([positions, torch.zeros_like(positions[:, :1])], dim=-1)
-#print("positions: ", positions)
-# test_pos = torch.tensor([[0.0, 0.0, 0.0], [0.0, 0.0, 1.0]], dtype=torch.float32, requires_grad=True)
+# x = torch.tensor([0.1, 0.2], dtype=torch.float32, requires_grad=True)
+# y = torch.tensor([0.0, 0.1], dtype=torch.float32, requires_grad=True)
+# positions = torch.stack([x, y], dim=1)
+# #positions = torch.cat([positions, torch.zeros_like(positions[:, :1])], dim=-1)
+# #print("positions: ", positions)
+# # test_pos = torch.tensor([[0.0, 0.0, 0.0], [0.0, 0.0, 1.0]], dtype=torch.float32, requires_grad=True)
 
-heights = pipeline.model.field.positions_to_heights(positions)
-#print("heights: ", heights)
-print(gradient(heights, x))
+# heights = pipeline.model.field.positions_to_heights(positions)
+# #print("heights: ", heights)
+# print(gradient(heights, x))
 
 # %% --------------------- Plot spatial derivatives --------------------- %% #
 
@@ -102,11 +105,11 @@ print(gradient(heights, x))
 
 # %% --------------------- Compute derivatives along path --------------------- %% #
 
-x0 = torch.tensor([0.0, 0.0], dtype=torch.float32, requires_grad=True)
-xf = torch.tensor([1.0, 1.0], dtype=torch.float32, requires_grad=True)
+# x0 = torch.tensor([0.0, 0.0], dtype=torch.float32, requires_grad=True)
+# xf = torch.tensor([1.0, 1.0], dtype=torch.float32, requires_grad=True)
 
-t = torch.linspace(0, 1, 100)
-positions = x0 + t[:, None] * (xf - x0)
-heights = pipeline.model.field.positions_to_heights(positions)
-print(positions.shape)
-print(gradient(heights, positions).shape)
+# t = torch.linspace(0, 1, 100)
+# positions = x0 + t[:, None] * (xf - x0)
+# heights = pipeline.model.field.positions_to_heights(positions)
+# print(positions.shape)
+# print(gradient(heights, positions).shape)
