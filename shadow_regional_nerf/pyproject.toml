@@ -1,0 +1,13 @@
+[project]
+name = "shadow-regional-nerf-methods"
+description = "NeRF models customized for shadows (NLOS) in regional map data with minimal deviation from nerfacto"
+version = "0.1.0"
+
+dependencies = ["nerfstudio >= 0.3.0"] 
+
+[tool.setuptools.packages.find]
+include = ["shadow_regional_nerfacto*"]
+
+# register the entry point of your new method here:
+[project.entry-points.'nerfstudio.method_configs']
+shadow-regional-nerfacto = 'shadow_regional_nerfacto.config:shadow_regional_nerfacto'
