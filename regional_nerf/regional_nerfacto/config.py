@@ -33,11 +33,6 @@ regional_nerfacto = MethodSpecification(
             dataparser=NerfstudioDataParserConfig(train_split_fraction=0.99),
             train_num_rays_per_batch=4096,
             eval_num_rays_per_batch=4096,
-            camera_optimizer=CameraOptimizerConfig(
-                mode="SO3xR3",
-                optimizer=AdamOptimizerConfig(lr=6e-4, eps=1e-8, weight_decay=1e-2),
-                scheduler=ExponentialDecaySchedulerConfig(lr_final=6e-6, max_steps=200000),
-            ),
         ),
             model=RNerfModelConfig(
                 eval_num_rays_per_chunk=1 << 15,
@@ -45,6 +40,7 @@ regional_nerfacto = MethodSpecification(
                 hashgrid_layers=(16,),
                 hashgrid_resolutions=((16, 512),),
                 num_lerf_samples=12,
+                camera_optimizer=CameraOptimizerConfig(mode="SO3xR3")
             ),
         ),
         optimizers={
@@ -56,9 +52,13 @@ regional_nerfacto = MethodSpecification(
                 "optimizer": RAdamOptimizerConfig(lr=1e-2, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(lr_final=1e-4, max_steps=200000),
             },
+            "camera_opt": {
+                "optimizer": AdamOptimizerConfig(lr=6e-4, eps=1e-8, weight_decay=1e-2),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=6e-6, max_steps=200000),
+            }
         },
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
         vis="viewer",
     ),
-    description="Regional Nerf method.",
+    description="[NAVLab] Regional Nerf method.",
 )

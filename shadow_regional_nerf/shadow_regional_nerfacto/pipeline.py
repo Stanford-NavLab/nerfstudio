@@ -10,17 +10,11 @@ import torch.distributed as dist
 from torch.cuda.amp.grad_scaler import GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-# from minimal_regional_nerfacto.datamanager import MRNerfDataManagerConfig
-# from minimal_regional_nerfacto.model import MRNerfModel, MRNerfModelConfig
 from nerfstudio.data.datamanagers.base_datamanager import (
     DataManager,
     DataManagerConfig,
 )
 from nerfstudio.models.base_model import ModelConfig
-# from nerfstudio.pipelines.base_pipeline import (
-#     VanillaPipeline,
-#     VanillaPipelineConfig,
-# )
 
 from minimal_regional_nerfacto.pipeline import (
     MRNerfPipeline,
