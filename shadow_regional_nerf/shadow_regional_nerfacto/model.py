@@ -33,7 +33,7 @@ class SRNerfModelConfig(MRNerfModelConfig):
     """SRNerf Model Configuration.
     """
 
-    _target: Type = field(default_factory=lambda: MRNerfModel)
+    _target: Type = field(default_factory=lambda: SRNerfModel)
     hashgrid_layers: Tuple[int] = (12, 12)
     hashgrid_resolutions: Tuple[Tuple[int]] = ((16, 128), (128, 512))
     hashgrid_sizes: Tuple[int] = (19, 19)
@@ -42,7 +42,7 @@ class SRNerfModelConfig(MRNerfModelConfig):
 class SRNerfModel(MRNerfModel):
     """Shadow Regional NeRF Model."""
 
-    config: MRNerfModelConfig
+    config: SRNerfModelConfig
 
     def populate_modules(self):
         super().populate_modules()

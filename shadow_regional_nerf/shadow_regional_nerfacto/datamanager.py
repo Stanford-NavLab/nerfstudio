@@ -24,7 +24,7 @@ from pathlib import Path
 import numpy as np
 import math
 
-from minimal_regional_nerfacto.utils.geodetic_utils import get_elevation
+# from minimal_regional_nerfacto.utils.geodetic_utils import get_elevation
 
 
 @dataclass
@@ -44,11 +44,11 @@ class SRNerfDataManager(MRNerfDataManager):
         config: the DataManagerConfig used to instantiate class
     """
 
-    config: MRNerfDataManagerConfig
+    config: SRNerfDataManagerConfig
 
     def __init__(
         self,
-        config: MRNerfDataManagerConfig,
+        config: SRNerfDataManagerConfig,
         device: Union[torch.device, str] = "cpu",
         test_mode: Literal["test", "val", "inference"] = "val",
         world_size: int = 1,

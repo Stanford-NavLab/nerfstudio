@@ -59,5 +59,5 @@ shadow_regional_nerfacto = MethodSpecification(
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
         vis="viewer",
     ),
-    description="Minimal Regional Nerf method.",
+    description="[NAVLab] Shadow Regional Nerf method.",
 )

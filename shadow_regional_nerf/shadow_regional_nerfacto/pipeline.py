@@ -35,11 +35,11 @@ from shadow_regional_nerfacto.model import SRNerfModel, SRNerfModelConfig
 class SRNerfPipelineConfig(MRNerfPipelineConfig):
     """Configuration for pipeline instantiation"""
 
-    _target: Type = field(default_factory=lambda: MRNerfPipeline)
+    _target: Type = field(default_factory=lambda: SRNerfPipeline)
     """target class to instantiate"""
-    datamanager: DataManagerConfig = MRNerfDataManagerConfig()
+    datamanager: DataManagerConfig = SRNerfDataManagerConfig()
     """specifies the datamanager config"""
-    model: ModelConfig = MRNerfModelConfig()
+    model: ModelConfig = SRNerfModelConfig()
     """specifies the model config"""
 
 
@@ -53,7 +53,7 @@ class SRNerfPipeline(MRNerfPipeline):
 
     def __init__(
         self,
-        config: MRNerfPipelineConfig,
+        config: SRNerfPipelineConfig,
         device: str,
         test_mode: Literal["test", "val", "inference"] = "val",
         world_size: int = 1,
