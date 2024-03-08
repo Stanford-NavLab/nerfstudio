@@ -1,5 +1,5 @@
 """
-Minimal Regional Nerfacto DataManager
+Shadow Regional Nerfacto DataManager
 """
 
 from dataclasses import dataclass, field
@@ -62,4 +62,3 @@ class SRNerfDataManager(MRNerfDataManager):
         self.create_enu_mapping()
         print("--------------------------------")
         print("[Data Manager] Finished ENU Mappings")
-        

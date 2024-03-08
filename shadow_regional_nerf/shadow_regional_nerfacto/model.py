@@ -1,36 +1,36 @@
 """
-Minimal Regional Nerfacto Model File
+Shadow Regional Nerfacto Model File
 
 Currently this subclasses the Nerfacto model. Consider subclassing from the base Model.
 """
-import math
+# import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Type
 
-# Geospatial conversions
-import pymap3d as pm
-
-import nerfacc
-import numpy as np
+# import nerfacc
+# import numpy as np
 import torch
-from minimal_regional_nerfacto.field import MRNerfField
+from shadow_regional_nerfacto.field import SRNerfField
 
 from nerfstudio.cameras.rays import RayBundle, RaySamples
 from nerfstudio.field_components.field_heads import FieldHeadNames
-from nerfstudio.field_components.spatial_distortions import SceneContraction
+
+# from nerfstudio.field_components.spatial_distortions import SceneContraction
 # from nerfstudio.model_components.losses import (
 #     MSELoss, distortion_loss, interlevel_loss, orientation_loss,
 #     pred_normal_loss, scale_gradients_by_distance_squared)
-from nerfstudio.models.base_model import Model, ModelConfig  # for custom Model
-from nerfstudio.models.nerfacto import (  # for subclassing Nerfacto model
-    NerfactoModel, NerfactoModelConfig)
-from nerfstudio.viewer.viewer_elements import ViewerText, ViewerButton
-from minimal_regional_nerfacto.utils.geodetic_utils import geodetic_to_enu
+# from nerfstudio.models.base_model import Model, ModelConfig  # for custom Model
+# from nerfstudio.models.nerfacto import (  # for subclassing Nerfacto model
+#     NerfactoModel, NerfactoModelConfig)
+# from nerfstudio.viewer.viewer_elements import ViewerText, ViewerButton
+# from minimal_regional_nerfacto.utils.geodetic_utils import geodetic_to_enu
+
+from minimal_regional_nerfacto.model import MRNerfModel, MRNerfModelConfig
 
 
 @dataclass
-class MRNerfModelConfig(NerfactoModelConfig):
-    """MRNerf Model Configuration.
+class SRNerfModelConfig(MRNerfModelConfig):
+    """SRNerf Model Configuration.
     """
 
     _target: Type = field(default_factory=lambda: MRNerfModel)
@@ -39,106 +39,13 @@ class MRNerfModelConfig(NerfactoModelConfig):
     hashgrid_sizes: Tuple[int] = (19, 19)
 
 
-class MRNerfModel(NerfactoModel):
-    """Minimal Regional NeRF Model."""
+class SRNerfModel(MRNerfModel):
+    """Shadow Regional NeRF Model."""
 
     config: MRNerfModelConfig
 
-    def set_enu_transform(self, *args, **kwargs):
-        self.field.set_enu_transform(*args, **kwargs)
-
     def populate_modules(self):
         super().populate_modules()
-
-        if self.config.disable_scene_contraction:
-            scene_contraction = None
-        else:
-            scene_contraction = SceneContraction(order=float("inf"))
-        
-        # Fields
-        self.field = MRNerfField(
-            grid_resolutions=self.config.hashgrid_resolutions,
-            grid_layers=self.config.hashgrid_layers,
-            grid_sizes=self.config.hashgrid_sizes,
-            aabb=self.scene_box.aabb,
-            hidden_dim=self.config.hidden_dim,
-            num_levels=self.config.num_levels,
-            max_res=self.config.max_res,
-            base_res=self.config.base_res,
-            features_per_level=self.config.features_per_level,
-            log2_hashmap_size=self.config.log2_hashmap_size,
-            hidden_dim_color=self.config.hidden_dim_color,
-            hidden_dim_transient=self.config.hidden_dim_transient,
-            spatial_distortion=scene_contraction,
-            num_images=self.num_train_data,
-            use_pred_normals=self.config.predict_normals,
-            use_average_appearance_embedding=self.config.use_average_appearance_embedding,
-            appearance_embedding_dim=self.config.appearance_embed_dim,
-            implementation=self.config.implementation,
-        )
-
-        self.latlon_reader = ViewerText("Lat, Lon", "", cb_hook=self.latlon_cb)
-        self.latlon_str = None
-        self.latlon_setter = ViewerButton(name="Set Lat/Lon", cb_hook=self.latlon_set)
-
-        self.nerf_from_enu_coords = None
-
-    def latlon_set(self, element):
-        """
-        Call back when user _sets_ the latitude and longitude in the viewer.
-        This is used for later visualizations.
-
-        Parameters:
-        --------------
-        element
-            Viewer element (e.g., the button)
-        """
-
-        if self.latlon_str is not None:
-            latlon_separated = self.latlon_str.split(",")
-
-            if len(latlon_separated) >= 2:
-                lat = float(latlon_separated[0])
-                lon = float(latlon_separated[1])
-                rclat = self.field.center_latlon[0]
-                rclon = self.field.center_latlon[1]
-                rcalt = self.field.center_height
-
-                # OLD VERSION
-                # # Convert latlon into ENU
-                # r_earth = 6378137.0 # (m)
-                # east, north, up = geodetic_to_enu(lat, lon, r_earth, rclat, rclon, r_earth)
-                # # Convert to (1x3) tensor
-                # enu = torch.tensor([east, north, up])[None, :].to(self.device)
-                # # Convert ENU into NeRF coordinates
-                # self.nerf_from_enu_coords = self.field.enu2nerf_points(enu).reshape(-1)
-
-                # NEW VERSION
-                # Convert latlon into ENU as a (1x3) torch tensor
-                enu = torch.tensor(pm.geodetic2enu(lat, lon, rcalt, 
-                                                   rclat, rclon, rcalt)).float().view(1, 3).to(self.device)
-                # Convert ENU into NeRF coordinates
-                self.nerf_from_enu_coords = self.field.enu2nerf_points(enu).reshape(-1)
-
-                # Print everything
-                print("Query Point lat, lon, alt: ", lat, lon, rcalt)
-                print("NeRF Center lat, lon, alt: ", rclat, rclon, rcalt)
-
-                print("ENU (m)   : ", enu)
-                print("NeRF coord: ", self.nerf_from_enu_coords)
-                
-    
-    def latlon_cb(self, element):
-        """
-        Waits for the set callback
-
-        Parameters:
-        --------------
-        element
-            Viewer element (e.g., the button)
-        """
-        # Change the button text box value
-        self.latlon_str = element.value
         
     def get_outputs(self, ray_bundle: RayBundle):
         """
