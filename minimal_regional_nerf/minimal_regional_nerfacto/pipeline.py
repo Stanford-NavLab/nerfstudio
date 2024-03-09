@@ -95,13 +95,15 @@ class MRNerfPipeline(VanillaPipeline):
             )
         print("----------------------------------------------------")
         print("[MRNeRF Pipeline] Sending model to GPU")
-        # print(self.model)
         self.model.to(device)
-        # Print the model to check
         print("----------------------------------------------------")
         print(f"[MRNeRF Pipeline] Model is on GPU: {device}")
-        # print(self.model)
 
+        # Run the ENU setting callback now that the device is on the GPU
+        # In particular, we need both model and datamanager on the same device
+        self.model.latlon_set(None)
+
+        # Code borrowed from Nerfacto
         self.world_size = world_size
         if world_size > 1:
             self._model = typing.cast(

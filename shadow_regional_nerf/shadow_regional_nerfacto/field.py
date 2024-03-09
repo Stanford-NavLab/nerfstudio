@@ -53,5 +53,4 @@ class SRNerfField(MRNerfField):
 
     def set_enu_transform(self, **kwargs):
         for key, value in kwargs.items():
-            print(f"Setting {key} to {value}")
             setattr(self, key, value)

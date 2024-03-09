@@ -143,6 +143,8 @@ class MRNerfDataManager(VanillaDataManager):
             # Convert to pose via identity rotation
             points *= transform_scale
             points = torch.cat([points, torch.ones_like(points[..., :1])], dim=-1)
+            print(f"Dataparser device {dataparser_transform.device}")
+            print(f"Points device {points.device}")
             points = dataparser_transform @ points[..., None]
             points = points[..., :3, 0]
             points *= dataparser_scale

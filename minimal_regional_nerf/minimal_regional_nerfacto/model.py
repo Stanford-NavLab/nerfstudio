@@ -24,7 +24,7 @@ from nerfstudio.field_components.spatial_distortions import SceneContraction
 from nerfstudio.models.base_model import Model, ModelConfig  # for custom Model
 from nerfstudio.models.nerfacto import (  # for subclassing Nerfacto model
     NerfactoModel, NerfactoModelConfig)
-from nerfstudio.viewer.viewer_elements import ViewerText, ViewerButton, ViewerDropdown
+from nerfstudio.viewer.viewer_elements import ViewerText, ViewerButton
 from minimal_regional_nerfacto.utils.geodetic_utils import geodetic_to_enu
 
 
@@ -83,14 +83,13 @@ class MRNerfModel(NerfactoModel):
             implementation=self.config.implementation,
         )
 
-        self.latlon_reader = ViewerText("Lat, Lon", "", 
+        self.latlon_reader = ViewerText("Lat, Lon", 
+                                        "", 
                                         cb_hook=self.latlon_cb,
                                         hint="Lat/Lon to Highlight")
         self.latlon_str = None
         self.latlon_setter = ViewerButton(name="Set Lat/Lon", 
                                           cb_hook=self.latlon_set)
-        self.fake_dropdown = ViewerDropdown(name="fake dropdwon",
-                                           hint="made you look")
 
         self.nerf_from_enu_coords = None
 

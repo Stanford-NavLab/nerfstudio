@@ -16,7 +16,7 @@ from nerfstudio.cameras.rays import RayBundle, RaySamples
 from nerfstudio.field_components.field_heads import FieldHeadNames
 
 from nerfstudio.field_components.spatial_distortions import SceneContraction
-from nerfstudio.viewer.viewer_elements import ViewerText, ViewerButton
+from nerfstudio.viewer.viewer_elements import ViewerText, ViewerButton, ViewerCheckbox
 
 
 # from nerfstudio.model_components.losses import (
@@ -76,14 +76,17 @@ class SRNerfModel(MRNerfModel):
             implementation=self.config.implementation,
         )
 
-        self.latlon_reader = ViewerText("Lat, Lon", "", cb_hook=self.latlon_cb)
+        self.latlon_reader = ViewerText("Lat, Lon", 
+                                        "", 
+                                        cb_hook=self.latlon_cb,
+                                        hint="Lat/Lon to Highlight")
         self.latlon_str = None
         self.latlon_setter = ViewerButton(name="Set Lat/Lon", cb_hook=self.latlon_set)
 
         # This will get set when Pipeline calls "set_enu_transforms"
         self.nerf_from_enu_coords = None
 
-        
+
     def get_outputs(self, ray_bundle: RayBundle):
         """
         This is the inference of the NeRF per ray.
@@ -150,7 +153,9 @@ class SRNerfModel(MRNerfModel):
 
         with torch.no_grad():
             outputs["max_density"], _ = torch.max(field_outputs[FieldHeadNames.DENSITY], dim=1)
+            outputs["max_density_log10"] = torch.log10(outputs["max_density"])
             outputs["sum_density"] = torch.sum(field_outputs[FieldHeadNames.DENSITY], dim=1)
+            outputs["sum_density_log10"] = torch.log10(outputs["sum_density"])
 
         #############
         # Minimal Regional NeRF
