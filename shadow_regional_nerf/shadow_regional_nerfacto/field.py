@@ -29,12 +29,21 @@ class SRNerfField(MRNerfField):
 
     def __init__(
         self, 
-        grid_resolutions,
-        grid_layers,
-        grid_sizes,
+        # grid_resolutions,
+        # grid_layers,
+        # grid_sizes,
         **kwargs) -> None:
         print("---------------------------")
-        print("STARTING SUPER INIT FIELD")
+        print("[SRNeRF Field] STARTING SUPER INIT FIELD")
+
+        # I get the impression that grid_* are left over and
+        # can be removed
+        # super().__init__(
+        #     grid_resolutions,
+        #     grid_layers,
+        #     grid_sizes,
+        #     **kwargs)
+
         super().__init__(**kwargs)
 
         self.top_cutoff = 1.0
@@ -44,4 +53,5 @@ class SRNerfField(MRNerfField):
 
     def set_enu_transform(self, **kwargs):
         for key, value in kwargs.items():
+            print(f"Setting {key} to {value}")
             setattr(self, key, value)

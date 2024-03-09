@@ -36,9 +36,9 @@ shadow_regional_nerfacto = MethodSpecification(
             ),
             model=SRNerfModelConfig(
                 eval_num_rays_per_chunk=1 << 15,
-                hashgrid_sizes=(19,),
-                hashgrid_layers=(16,),
-                hashgrid_resolutions=((16, 512),),
+                # hashgrid_sizes=(19,),
+                # hashgrid_layers=(16,),
+                # hashgrid_resolutions=((16, 512),),
                 camera_optimizer=CameraOptimizerConfig(mode="off")
             ),
         ),

@@ -15,14 +15,16 @@ from shadow_regional_nerfacto.field import SRNerfField
 from nerfstudio.cameras.rays import RayBundle, RaySamples
 from nerfstudio.field_components.field_heads import FieldHeadNames
 
-# from nerfstudio.field_components.spatial_distortions import SceneContraction
+from nerfstudio.field_components.spatial_distortions import SceneContraction
+from nerfstudio.viewer.viewer_elements import ViewerText, ViewerButton
+
+
 # from nerfstudio.model_components.losses import (
 #     MSELoss, distortion_loss, interlevel_loss, orientation_loss,
 #     pred_normal_loss, scale_gradients_by_distance_squared)
 # from nerfstudio.models.base_model import Model, ModelConfig  # for custom Model
 # from nerfstudio.models.nerfacto import (  # for subclassing Nerfacto model
 #     NerfactoModel, NerfactoModelConfig)
-# from nerfstudio.viewer.viewer_elements import ViewerText, ViewerButton
 # from minimal_regional_nerfacto.utils.geodetic_utils import geodetic_to_enu
 
 from minimal_regional_nerfacto.model import MRNerfModel, MRNerfModelConfig
@@ -45,7 +47,42 @@ class SRNerfModel(MRNerfModel):
     config: SRNerfModelConfig
 
     def populate_modules(self):
-        super().populate_modules()
+        super(MRNerfModel, self).populate_modules()
+
+        if self.config.disable_scene_contraction:
+            scene_contraction = None
+        else:
+            scene_contraction = SceneContraction(order=float("inf"))
+        
+        # Fields
+        self.field = SRNerfField(
+            # grid_resolutions=self.config.hashgrid_resolutions,
+            # grid_layers=self.config.hashgrid_layers,
+            # grid_sizes=self.config.hashgrid_sizes,
+            aabb=self.scene_box.aabb,
+            hidden_dim=self.config.hidden_dim,
+            num_levels=self.config.num_levels,
+            max_res=self.config.max_res,
+            base_res=self.config.base_res,
+            features_per_level=self.config.features_per_level,
+            log2_hashmap_size=self.config.log2_hashmap_size,
+            hidden_dim_color=self.config.hidden_dim_color,
+            hidden_dim_transient=self.config.hidden_dim_transient,
+            spatial_distortion=scene_contraction,
+            num_images=self.num_train_data,
+            use_pred_normals=self.config.predict_normals,
+            use_average_appearance_embedding=self.config.use_average_appearance_embedding,
+            appearance_embedding_dim=self.config.appearance_embed_dim,
+            implementation=self.config.implementation,
+        )
+
+        self.latlon_reader = ViewerText("Lat, Lon", "", cb_hook=self.latlon_cb)
+        self.latlon_str = None
+        self.latlon_setter = ViewerButton(name="Set Lat/Lon", cb_hook=self.latlon_set)
+
+        # This will get set when Pipeline calls "set_enu_transforms"
+        self.nerf_from_enu_coords = None
+
         
     def get_outputs(self, ray_bundle: RayBundle):
         """

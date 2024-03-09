@@ -24,7 +24,7 @@ from nerfstudio.field_components.spatial_distortions import SceneContraction
 from nerfstudio.models.base_model import Model, ModelConfig  # for custom Model
 from nerfstudio.models.nerfacto import (  # for subclassing Nerfacto model
     NerfactoModel, NerfactoModelConfig)
-from nerfstudio.viewer.viewer_elements import ViewerText, ViewerButton
+from nerfstudio.viewer.viewer_elements import ViewerText, ViewerButton, ViewerDropdown
 from minimal_regional_nerfacto.utils.geodetic_utils import geodetic_to_enu
 
 
@@ -46,6 +46,12 @@ class MRNerfModel(NerfactoModel):
 
     def set_enu_transform(self, *args, **kwargs):
         self.field.set_enu_transform(*args, **kwargs)
+        # Now that we have the ENU transforms set in the field,
+        # we should update the defaults of our ENU variables.
+        rclat = self.field.center_latlon[0]
+        rclon = self.field.center_latlon[1]
+        self.latlon_str = f"{rclat}, {rclon}"
+        self.latlon_reader.default_value = self.latlon_str
 
     def populate_modules(self):
         super().populate_modules()
@@ -77,9 +83,14 @@ class MRNerfModel(NerfactoModel):
             implementation=self.config.implementation,
         )
 
-        self.latlon_reader = ViewerText("Lat, Lon", "", cb_hook=self.latlon_cb)
+        self.latlon_reader = ViewerText("Lat, Lon", "", 
+                                        cb_hook=self.latlon_cb,
+                                        hint="Lat/Lon to Highlight")
         self.latlon_str = None
-        self.latlon_setter = ViewerButton(name="Set Lat/Lon", cb_hook=self.latlon_set)
+        self.latlon_setter = ViewerButton(name="Set Lat/Lon", 
+                                          cb_hook=self.latlon_set)
+        self.fake_dropdown = ViewerDropdown(name="fake dropdwon",
+                                           hint="made you look")
 
         self.nerf_from_enu_coords = None
 

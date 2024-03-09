@@ -26,18 +26,18 @@ class MRNerfField(NerfactoField):
 
     def __init__(
         self, 
-        grid_resolutions,
-        grid_layers,
-        grid_sizes,
+        # grid_resolutions,
+        # grid_layers,
+        # grid_sizes,
         **kwargs) -> None:
         print("---------------------------")
-        print("STARTING SUPER INIT FIELD")
+        print("[MRNeRF Field] STARTING SUPER INIT FIELD")
         super().__init__(**kwargs)
 
         self.top_cutoff = 1.0
 
         print("---------------------------")
-        print("FINISHED FIELD")
+        print("[MRNeRF Field] FINISHED FIELD")
 
     def set_enu_transform(self, **kwargs):
         for key, value in kwargs.items():

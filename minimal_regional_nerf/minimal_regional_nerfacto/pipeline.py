@@ -52,22 +52,23 @@ class MRNerfPipeline(VanillaPipeline):
         grad_scaler: Optional[GradScaler] = None,
     ):
         print("---------------------------")
-        print("STARTING SUPER INIT PIPELINE")
+        print("[MRNeRF Pipeline] STARTING SUPER INIT PIPELINE")
+        # VanillaPipeline, self
         super(VanillaPipeline, self).__init__()
         self.config = config
         self.test_mode = test_mode
 
         print("---------------------------")
-        print("[Pipeline] Setting up datamanager")
+        print("[MRNeRF Pipeline] Setting up datamanager")
         self.datamanager: DataManager = config.datamanager.setup(
             device=device, test_mode=test_mode, world_size=world_size, local_rank=local_rank
         )
         print("----------------------------------------------------")
-        print("[Pipeline] Sending data manager to GPU")
+        print("[MRNeRF Pipeline] Sending data manager to GPU")
         # print(self.datamanager)
         self.datamanager.to(device)
         print("----------------------------------------------------")
-        print(f"[Pipeline] Data manager that is on GPU: {device}")
+        print(f"[MRNeRF Pipeline] Data manager that is on GPU: {device}")
         # print(self.datamanager)
 
         assert self.datamanager.train_dataset is not None, "Missing input dataset"
@@ -83,7 +84,7 @@ class MRNerfPipeline(VanillaPipeline):
         # Minimal Regional Nerf Specific
         ######################
         print("----------------------------------------------------")
-        print("[Pipeline] Setting ENU transforms")
+        print("[MRNeRF Pipeline] Setting ENU transforms")
         self.model.set_enu_transform(
             enu2nerf=self.datamanager.enu2nerf, 
             nerf2enu=self.datamanager.nerf2enu, 
@@ -93,12 +94,12 @@ class MRNerfPipeline(VanillaPipeline):
             center_height=self.datamanager.center_height
             )
         print("----------------------------------------------------")
-        print("[Pipeline] Sending model to GPU")
+        print("[MRNeRF Pipeline] Sending model to GPU")
         # print(self.model)
         self.model.to(device)
         # Print the model to check
         print("----------------------------------------------------")
-        print(f"[Pipeline] Model is on GPU: {device}")
+        print(f"[MRNeRF Pipeline] Model is on GPU: {device}")
         # print(self.model)
 
         self.world_size = world_size
