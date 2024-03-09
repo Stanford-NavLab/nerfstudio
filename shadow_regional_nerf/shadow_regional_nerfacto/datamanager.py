@@ -58,7 +58,3 @@ class SRNerfDataManager(MRNerfDataManager):
         super().__init__(
             config=config, device=device, test_mode=test_mode, world_size=world_size, local_rank=local_rank, **kwargs
         )
-
-        self.create_enu_mapping()
-        print("--------------------------------")
-        print("[Data Manager] Finished ENU Mappings")

@@ -56,4 +56,11 @@ class SRNerfPipeline(MRNerfPipeline):
     ):
         print("---------------------------")
         print("STARTING SUPER INIT PIPELINE FROM MRNERF")
-        super(MRNerfPipeline, self).__init__()
+        super(MRNerfPipeline, self).__init__(
+            config=config,
+            device=device,
+            test_mode=test_mode,
+            world_size=world_size,
+            local_rank=local_rank,
+            grad_scaler=grad_scaler
+        )

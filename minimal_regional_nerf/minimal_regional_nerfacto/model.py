@@ -203,7 +203,7 @@ class MRNerfModel(NerfactoModel):
             # Convert nerf_from_enu_coords to same shape as xy
             nerf_from_enu_coords = self.nerf_from_enu_coords[:2].unsqueeze(0).expand_as(xy)
             
-            # If xy is within epsilon of dino_coords, set mask to 1 else 0
+            # If xy is within epsilon of the NeRF ENU coords, set mask to 1 else 0
             cylinder_radius = 0.05
             mask = (torch.norm(xy - nerf_from_enu_coords, dim=-1) < cylinder_radius).unsqueeze(-1)
             

@@ -56,6 +56,10 @@ class SRNerfModel(MRNerfModel):
         ray_bundle
             The rays that we want to accumulate the field of.
         """
+        
+        #############
+        # Standard NeRF
+
         ray_samples: RaySamples
         ray_samples, weights_list, ray_samples_list = self.proposal_sampler(ray_bundle, density_fns=self.density_fns)
         field_outputs = self.field.forward(ray_samples, compute_normals=self.config.predict_normals)
@@ -103,6 +107,17 @@ class SRNerfModel(MRNerfModel):
         for i in range(self.config.num_proposal_iterations):
             outputs[f"prop_depth_{i}"] = self.renderer_depth(weights=weights_list[i], ray_samples=ray_samples_list[i])
 
+
+        #############
+        # Shadow / NLOS Features
+
+        with torch.no_grad():
+            outputs["max_density"], _ = torch.max(field_outputs[FieldHeadNames.DENSITY], dim=1)
+            outputs["sum_density"] = torch.sum(field_outputs[FieldHeadNames.DENSITY], dim=1)
+
+        #############
+        # Minimal Regional NeRF
+
         # If nerf_from_enu_coords is not None, visualize the nerf_from_enu_coords (i.e., user query point)
         if self.nerf_from_enu_coords is not None:
             xy = ray_samples.frustums.get_positions()[..., :2].detach()
@@ -110,7 +125,7 @@ class SRNerfModel(MRNerfModel):
             # Convert nerf_from_enu_coords to same shape as xy
             nerf_from_enu_coords = self.nerf_from_enu_coords[:2].unsqueeze(0).expand_as(xy)
             
-            # If xy is within epsilon of dino_coords, set mask to 1 else 0
+            # If xy is within epsilon of the NeRF ENU coords, set mask to 1 else 0
             cylinder_radius = 0.05
             mask = (torch.norm(xy - nerf_from_enu_coords, dim=-1) < cylinder_radius).unsqueeze(-1)
             
