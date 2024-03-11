@@ -383,10 +383,14 @@ class CropData:
 
     background_color: Float[Tensor, "3"] = torch.Tensor([0.0, 0.0, 0.0])
     """background color"""
-    center: Float[Tensor, "3"] = torch.Tensor([0.0, 0.0, 0.0])
-    """center of the crop"""
-    scale: Float[Tensor, "3"] = torch.Tensor([2.0, 2.0, 2.0])
-    """scale of the crop"""
+    # center: Float[Tensor, "3"] = torch.Tensor([0.0, 0.0, 0.0])
+    # """center of the crop"""
+    # scale: Float[Tensor, "3"] = torch.Tensor([2.0, 2.0, 2.0])
+    # """scale of the crop"""
+    ################
+    # Daniel added from newer Nerfstudio
+    obb: OrientedBox = field(default_factory=lambda: OrientedBox(R=torch.eye(3), T=torch.zeros(3), S=torch.ones(3) * 2))
+    """Oriented box representing the crop region"""
 
     # properties for backwards-compatibility interface
     @property

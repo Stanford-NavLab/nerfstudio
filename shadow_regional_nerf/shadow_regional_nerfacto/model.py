@@ -157,6 +157,10 @@ class SRNerfModel(MRNerfModel):
             outputs["sum_density"] = torch.sum(field_outputs[FieldHeadNames.DENSITY], dim=1)
             outputs["sum_density_log10"] = torch.log10(outputs["sum_density"])
 
+            # print("From Max Density", torch.min(outputs["max_density"]), torch.max(outputs["max_density"]))
+            # print(f"From Max Density: ({torch.min(outputs["max_density"])}, {torch.max(outputs["max_density"])})")
+            # print(f"From Sum Density: ({torch.min(outputs["sum_density"])}, {torch.max(outputs["sum_density"])})")
+
         #############
         # Minimal Regional NeRF
 
