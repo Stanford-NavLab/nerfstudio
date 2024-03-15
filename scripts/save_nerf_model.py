@@ -19,7 +19,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESMoonRender/regional-nerfacto/2023-10-25_144723/config.yml'))
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESMoonRender/regional-nerfacto/2023-11-06_145111/config.yml'))
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESSanJose/regional-nerfacto/2023-11-08_100320/config.yml'))
-config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/RedRocks/terrain-nerfacto/2024-03-07_145438/config.yml'))
+config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/RedRocks/terrain-nerfacto/2024-03-13_153603/config.yml'))
 
 
 # TODO: arg: model component options
@@ -30,6 +30,7 @@ config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF
 # print("saved model")
 
 # print("Ground height: ", pipeline.model.field.ground_height)
+
 
 # %% --------------------- Sample heights --------------------- %% #
 

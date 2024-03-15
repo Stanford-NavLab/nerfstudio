@@ -138,9 +138,9 @@ class TNerfField(NerfactoField):
             ground_height = -10000.0
 
         # Selector to mask out positions with z higher than heightcaps
-        selector_0 = (unnorm_positions[..., 2] <= heightcaps)
+        #selector_0 = (unnorm_positions[..., 2] <= heightcaps)
         #selector_0 = (unnorm_positions[..., 2] <= heightcaps) & (unnorm_positions[..., 2] >= ground_height) # Navlab added
-        #selector_0 = True
+        selector_0 = True
         
         # ------ Standard Nerfstudio masking ------ #
         selector = selector_0 & ((positions > 0.0) & (positions < 1.0)).all(dim=-1)
@@ -198,9 +198,14 @@ class TNerfField(NerfactoField):
         positions = self.spatial_distortion(positions)
         positions = (positions + 2.0) / 4.0
 
-        xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
-        x = torch.concat(xs, dim=-1)
+        if self.height_net_arch == 'SIREN':
+            x = positions.view(-1, 3)[:, :2]
+            heights, coords = self.height_net(x)
+            heights = heights.view(*inp_shape[:-1], -1)
+        elif self.height_net_arch == 'MLP':
+            xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
+            x = torch.concat(xs, dim=-1)
 
-        # TODO: Reshape to multi-batch
-        heights = self.height_net(x).view(*inp_shape[:-1], -1)
+            heights = self.height_net(x).view(*inp_shape[:-1], -1)
+        
         return heights

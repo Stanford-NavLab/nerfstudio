@@ -161,11 +161,11 @@ class TNerfModel(NerfactoModel):
         ground_penalty = torch.square(ground_height - torch.min(heightcap_field_outputs["heightcap"]))
 
         if self.training:
-            outputs["height_penalty"] = torch.sum(height_weights * heightcap_penalty, dim=-2)
-            outputs["ground_penalty"] = torch.sum(height_weights * ground_penalty, dim=-2)
+            outputs["height_penalty"] = torch.sum(height_weights.detach() * heightcap_penalty.detach(), dim=-2)
+            outputs["ground_penalty"] = torch.sum(height_weights.detach() * ground_penalty.detach(), dim=-2)
         
             # Hard penalty for height exceeding the camera height
-            outputs["heightcap_net_output"] = torch.sum(height_weights * heightcap_field_outputs["heightcap"], dim=-2)
+            outputs["heightcap_net_output"] = torch.sum(height_weights.detach() * heightcap_field_outputs["heightcap"].detach(), dim=-2)
 
             # Compute heightnet spatial derivatives
             # - Sample some xy points, for each xy point, consider a small delta in x and y and compute the difference in height
