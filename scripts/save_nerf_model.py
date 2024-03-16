@@ -18,9 +18,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/MoonTestScenario/regional-nerfacto/2023-10-13_135547/config.yml'))
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESMoonRender/regional-nerfacto/2023-10-25_144723/config.yml'))
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESMoonRender/regional-nerfacto/2023-11-06_145111/config.yml'))
-#config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESSanJose/regional-nerfacto/2023-11-08_100320/config.yml'))
-config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/RedRocks/terrain-nerfacto/2024-03-13_153603/config.yml'))
+#config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESSanJose/terrain-nerfacto/2024-03-15_161957/config.yml'))
+config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/RedRocks/terrain-nerfacto/2024-03-15_175147/config.yml'))
 
+print(device, pipeline.device)
 
 # TODO: arg: model component options
 
@@ -36,11 +37,14 @@ config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF
 
 # Random Nx3 values
 N = 512
+bound = 0.75
 XY_grid = torch.meshgrid(
-    torch.linspace(-2, 2, N, device=device),
-    torch.linspace(-2, 2, N, device=device),
+    torch.linspace(-bound, bound, N, device=device),
+    torch.linspace(-bound, bound, N, device=device),
     indexing='xy'
 )
+# x_grid = XY_grid[0].cpu().numpy()
+# y_grid = XY_grid[1].cpu().numpy()
 XY_grid = torch.stack(XY_grid, dim=-1)
 positions = XY_grid.reshape(-1, 2)
 #positions = torch.cat([positions, torch.zeros_like(positions[:, :1])], dim=-1)
@@ -50,12 +54,16 @@ x = xy[:,0]
 y = xy[:,1] 
 z = pipeline.model.field.positions_to_heights(positions).detach().cpu().numpy().flatten()
 
+print("Ground height: ", pipeline.model.field.ground_height)
+print("Min z: ", z.min())
+
 # keep = z < -1.5
 # x = x[keep]
 # y = y[keep]
 # z = z[keep]
 
-fig = go.Figure(data=[go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=2, color=z, colorscale='Viridis'))])
+# fig = go.Figure(data=[go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=2, color=z, colorscale='Viridis'))])
+fig = go.Figure(data=[go.Surface(x=x.reshape(N, N), y=y.reshape(N, N), z=z.reshape(N, N))])
 fig.update_layout(title='Elevation Model', width=1500, height=800)
 fig.update_layout(scene_aspectmode='data')
 fig.show()

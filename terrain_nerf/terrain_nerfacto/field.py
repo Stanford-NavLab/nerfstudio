@@ -55,7 +55,7 @@ class TNerfField(NerfactoField):
 
         self.top_cutoff = 1.0   # Assume no density above cameras
 
-        self.height_net_arch = 'SIREN'  # 'SIREN' or 'MLP'
+        self.height_net_arch = 'MLP'  # 'SIREN' or 'MLP'
 
         if self.height_net_arch == 'SIREN':
             self.height_net = Siren(in_features=2, out_features=1, hidden_features=256,
@@ -80,12 +80,14 @@ class TNerfField(NerfactoField):
                 n_output_dims=1,
                 network_config={
                     "otype": "CutlassMLP",
-                    "activation": "ReLU",
+                    "activation": "Sine",   # NOTE: changed from "ReLU"
                     "output_activation": "None",
                     "n_neurons": 256,
                     "n_hidden_layers": 1,
                 },
             )
+            # self.height_net = Siren(in_features=tot_out_dims_2d, out_features=1, hidden_features=256,
+            #                         hidden_layers=1, outermost_linear=True)
 
         # Create a single trainable variable to store ground height
         self.ground_height = torch.nn.Parameter(torch.tensor(0.0))
@@ -137,10 +139,11 @@ class TNerfField(NerfactoField):
             heightcaps = 10000.0 
             ground_height = -10000.0
 
+        selector_0 = (unnorm_positions[..., 2] <= -0.25)
         # Selector to mask out positions with z higher than heightcaps
-        #selector_0 = (unnorm_positions[..., 2] <= heightcaps)
+        selector_0 = selector_0 & (unnorm_positions[..., 2] <= heightcaps)
         #selector_0 = (unnorm_positions[..., 2] <= heightcaps) & (unnorm_positions[..., 2] >= ground_height) # Navlab added
-        selector_0 = True
+        #selector_0 = True
         
         # ------ Standard Nerfstudio masking ------ #
         selector = selector_0 & ((positions > 0.0) & (positions < 1.0)).all(dim=-1)
@@ -187,12 +190,31 @@ class TNerfField(NerfactoField):
         
         return outputs
     
+
+    def get_heights(self, positions):
+        positions = self.spatial_distortion(positions) # -2 to 2
+        positions = positions / 2.0            # -1 to 1
+
+        if self.height_net_arch == 'SIREN':
+            x = positions.view(-1, 3)[:, :2]
+            heightcap_pass, coords = self.height_net(x)
+            #heightcap_pass = heightcap_pass.view(*ray_samples.frustums.shape, -1)
+        elif self.height_net_arch == 'MLP':
+            xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
+            x = torch.concat(xs, dim=-1)
+
+            heightcap_pass = self.height_net(x).view(*ray_samples.frustums.shape, -1)
+
+        return heightcap_pass
+
+    
     def get_ground_height(self):
         return self.ground_height
 
 
     # TODO: clean-up / consolidate these methods
     def positions_to_heights(self, positions):
+        """Positions are 2D for now"""
         inp_shape = positions.shape
         positions = torch.cat([positions, torch.zeros_like(positions[..., :1])], dim=-1)
         positions = self.spatial_distortion(positions)

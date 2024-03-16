@@ -79,7 +79,7 @@ class TNerfModel(NerfactoModel):
             implementation=self.config.implementation,
         )
 
-        self.tall_loss_factor = 0.01
+        self.tall_loss_factor = 1.0
         self.max_height = 1.0
         self.quantile_frac = 0.9
         self.ground_forget_fac = 0.1
@@ -92,6 +92,16 @@ class TNerfModel(NerfactoModel):
         ray_samples: RaySamples
         # Importance sampling from proposal distribution
         ray_samples, weights_list, ray_samples_list = self.proposal_sampler(ray_bundle, density_fns=self.density_fns)
+
+        # ==== added for heightcap ====
+        heightcap_field_outputs = self.field.get_heightcap_outputs(ray_samples)
+        height = ray_samples.frustums.get_positions().detach()[..., 2][..., None]
+        #ground_height = self.field.get_ground_height()
+
+        # Use full density field when computing height penalty
+        height_density, _ = self.field.get_density(ray_samples, do_heightcap=False)
+        height_weights = ray_samples.get_weights(height_density.detach())
+        # ==== added for heightcap ====
 
         # Push the ray samples through the field
         field_outputs = self.field.forward(ray_samples, compute_normals=self.config.predict_normals)
@@ -145,27 +155,37 @@ class TNerfModel(NerfactoModel):
         # Render depth 
         for i in range(self.config.num_proposal_iterations):
             outputs[f"prop_depth_{i}"] = self.renderer_depth(weights=weights_list[i], ray_samples=ray_samples_list[i])
+
+        # Use depth to project to xyz point
+        # depth = outputs["depth"]
+
+        # ray_origins = ray_bundle.origins
+        # ray_directions = ray_bundle.directions
+
+        # # Project to xyz
+        # xyz = ray_origins + ray_directions * depth
+        # #print("xyz shape: ", xyz.shape)
+
+        # pred_z = self.field.get_heights(xyz)
+        # #print("pred_z shape: ", pred_z.shape, "z shape: ", xyz[:, 2].shape)
+        # outputs["height_penalty"] = torch.mean((pred_z - xyz[:, 2])**2)
+        # #print("height_penalty: ", outputs["height_penalty"])
+
         
         # Heightcap
-        heightcap_field_outputs = self.field.get_heightcap_outputs(ray_samples)
-        height = ray_samples.frustums.get_positions()[..., 2][..., None]
-        ground_height = self.field.get_ground_height()
-
-        # Use full density field when computing height penalty
-        height_density, _ = self.field.get_density(ray_samples, do_heightcap=False)
-        height_weights = ray_samples.get_weights(height_density.detach())
 
         # Soft penalty for height exceeding the heightcap: y = max(0, height - x) + (1 - quantile_frac)*x
-        heightcap_penalty = torch.relu(height - heightcap_field_outputs["heightcap"]) + (1.0 - self.quantile_frac) * heightcap_field_outputs["heightcap"]
+        error = height - heightcap_field_outputs["heightcap"]
+        heightcap_penalty = torch.max((self.quantile_frac - 1) * error, self.quantile_frac * error)
         # TODO: adjust the quantile frac such that most points below have density, but points above don't
-        ground_penalty = torch.square(ground_height - torch.min(heightcap_field_outputs["heightcap"]))
+        #ground_penalty = torch.square(ground_height - torch.min(heightcap_field_outputs["heightcap"]))
 
         if self.training:
-            outputs["height_penalty"] = torch.sum(height_weights.detach() * heightcap_penalty.detach(), dim=-2)
-            outputs["ground_penalty"] = torch.sum(height_weights.detach() * ground_penalty.detach(), dim=-2)
+            outputs["height_penalty"] = torch.sum(height_weights.detach() * heightcap_penalty, dim=-2)
+            #outputs["ground_penalty"] = torch.sum(height_weights.detach() * ground_penalty, dim=-2)
         
-            # Hard penalty for height exceeding the camera height
-            outputs["heightcap_net_output"] = torch.sum(height_weights.detach() * heightcap_field_outputs["heightcap"].detach(), dim=-2)
+        # Hard penalty for height exceeding the camera height
+        outputs["heightcap_net_output"] = torch.sum(height_weights.detach() * heightcap_field_outputs["heightcap"], dim=-2)
 
             # Compute heightnet spatial derivatives
             # - Sample some xy points, for each xy point, consider a small delta in x and y and compute the difference in height
@@ -198,9 +218,11 @@ class TNerfModel(NerfactoModel):
 
         if self.training:
             pass
+            #loss_dict["heightcap_loss"] = 1.0 * outputs["height_penalty"]
+
             # Add height opacity loss by its average
             loss_dict["height_opacity_loss"] = self.tall_loss_factor * outputs["height_penalty"].sum(dim=-1).nanmean()
-            loss_dict["ground_opacity_loss"] = self.tall_loss_factor * outputs["ground_penalty"].sum(dim=-1).nanmean()
+            #loss_dict["ground_opacity_loss"] = self.tall_loss_factor * outputs["ground_penalty"].sum(dim=-1).nanmean()
             
             # Enforce heightnet smoothness loss
             # Temperature: starts at 0 and increases to 1
