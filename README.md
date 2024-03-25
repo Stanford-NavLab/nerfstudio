@@ -1,6 +1,6 @@
-# NeRFstudio fork for Stanford NAVLab
+# NeRFstudio fork for Stanford NAV Lab
 
-This is a fork of the [NeRFstudio](https://github.com/nerfstudio-project/nerfstudio/) project. It is used in the construction of Neural City Maps, a project by the Stanford NAVLab.
+This is a fork of the [NeRFstudio](https://github.com/nerfstudio-project/nerfstudio/) repository. It is used in the construction of Neural City Maps, a project by the Stanford NAV Lab.
 
 This branch (adam/terrain) is used for the Neural Elevation Models (NEMo) project, for terrain mapping and path planning. The `terrain_nerf` folder contains the code for the `terrain-nerfacto` method, which implements NEMo (a combined radiance field and height field).
 
@@ -14,7 +14,7 @@ pip install --upgrade pip setuptools
 pip install -e .
 ```
 
-Next, install the `terrain_nerf` package:
+Then, install the `terrain_nerf` package:
 ```
 cd terrain_nerf
 pip install -e .
@@ -44,8 +44,14 @@ Data preparation is identical to that of Nerfstudio.
 1. Create a `/data` folder within the repo.
 2. For each scene, create a folder within `/data` (e.g., `/Scene01`).
 3. Inside the scene folder, place imagery and a `transforms.json` file containing camera poses and parameters. If needed, use COLMAP or Nerfstudio's `ns-process-data` to estimate camera poses.
-4. 
+
 
 ## Training
 
-`ns-train `
+As per Nerfstudio training procedure, run the following command:
+```
+ns-train terrain-nerfacto --data data/Scene01
+```
+and monitor training through Viser and/or Weights and Biases.
+
+To save height field weights, use `scripts/save_nerf_model.py`.
