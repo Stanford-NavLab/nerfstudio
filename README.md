@@ -30,9 +30,13 @@ We use simulated imagery from [Google Earth Studio](https://www.google.com/earth
 GES allows for rendering imagery of any location on Earth (and the Moon and Mars) using Google Earth. An account is needed.
 
 1. Generate GES `.esp` project file from lat/lon/alt using `scripts/generate_ges_traj.py`
+     - e.g., `python scripts/generate_ges_traj.py ges_traj.esp 37.333976 -121.8875317 200 --template Templates/Transamerica.json`
 2. Load the `.esp` file into GES (create blank project, then import)
-3. Set settings, then render.
+     - Set total time to 10 seconds (with 30 FPS for a total of 300 frames), check "Scale existing keyframes"
+3. After setting settings, then render.
+     - Drag Google Earth logo to bottom right corner
 4. Use `scripts/ges2transforms.py` to generate `transforms.json`.
+     - e.g., `python scripts/ges2transforms.py ../nerfstudio_ws/GESSanJose/ san_jose.json 37.333976 -121.8875317`
 
 ### Preparation
 
@@ -40,7 +44,8 @@ Data preparation is identical to that of Nerfstudio.
 1. Create a `/data` folder within the repo.
 2. For each scene, create a folder within `/data` (e.g., `/Scene01`).
 3. Inside the scene folder, place imagery and a `transforms.json` file containing camera poses and parameters. If needed, use COLMAP or Nerfstudio's `ns-process-data` to estimate camera poses.
+4. 
 
 ## Training
 
-
+`ns-train `
