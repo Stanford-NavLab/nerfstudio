@@ -22,7 +22,7 @@ torch.manual_seed(42)
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/poster/nerfacto/2023-09-03_160741/config.yml'))
 
 # Moon Test Scenario
-config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/RedRocks_Siren3Layer/terrain-nerfacto/2024-03-15_181645/config.yml'))
+config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/RedRocks/terrain-nerfacto/2024-03-15_194521/config.yml'))
 
 
 print(f"Using checkpoint_path: {checkpoint_path}")
@@ -116,5 +116,6 @@ if __name__ == "__main__":
         fig.update_layout(title='Elevation Model', width=1500, height=800)
         fig.update_layout(scene_aspectmode='data')
         fig.show()
+        fig.write_html("red_rocks_depth.html")
 
 

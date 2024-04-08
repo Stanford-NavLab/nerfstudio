@@ -19,7 +19,13 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESMoonRender/regional-nerfacto/2023-10-25_144723/config.yml'))
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESMoonRender/regional-nerfacto/2023-11-06_145111/config.yml'))
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESSanJose/terrain-nerfacto/2024-03-15_161957/config.yml'))
-config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/RedRocks/terrain-nerfacto/2024-03-15_175147/config.yml'))
+
+#config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/RedRocks/terrain-nerfacto/2024-03-15_175147/config.yml'))  # RedRocks MLP sine
+config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/RedRocks/terrain-nerfacto/2024-03-15_194521/config.yml'))  # RedRocks MLP relu
+#config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/GES_KT22/terrain-nerfacto/2024-03-15_203528/config.yml')) # KT22 MLP relu
+#config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/GES_KT22/terrain-nerfacto/2024-03-21_132915/config.yml'))  # GES Moon MLP relu
+
+
 
 print(device, pipeline.device)
 
@@ -27,7 +33,8 @@ print(device, pipeline.device)
 
 # TODO: arg: save path
 
-# torch.save(pipeline.model.field.height_net.state_dict(), 'red_rocks_height_net.pth')
+torch.save(pipeline.model.field.encs2d[0].state_dict(), 'outputs/redrocks_encs_relu.pth')
+torch.save(pipeline.model.field.height_net.state_dict(), 'outputs/redrocks_height_net_relu.pth')
 # print("saved model")
 
 # print("Ground height: ", pipeline.model.field.ground_height)
@@ -67,7 +74,7 @@ fig = go.Figure(data=[go.Surface(x=x.reshape(N, N), y=y.reshape(N, N), z=z.resha
 fig.update_layout(title='Elevation Model', width=1500, height=800)
 fig.update_layout(scene_aspectmode='data')
 fig.show()
-#fig.write_html("ges_moon_heightcap_net.html")
+# fig.write_html("kt22.html")
 
 
 # %% ------------------ Test computing spatial derivatives ------------------ %% #

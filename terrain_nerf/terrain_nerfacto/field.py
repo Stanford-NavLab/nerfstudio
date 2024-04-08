@@ -80,7 +80,7 @@ class TNerfField(NerfactoField):
                 n_output_dims=1,
                 network_config={
                     "otype": "CutlassMLP",
-                    "activation": "Sine",   # NOTE: changed from "ReLU"
+                    "activation": "ReLU",   
                     "output_activation": "None",
                     "n_neurons": 256,
                     "n_hidden_layers": 1,
