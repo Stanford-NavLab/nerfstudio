@@ -346,7 +346,7 @@ def _compute_residual_and_jacobian(
     xd: torch.Tensor,
     yd: torch.Tensor,
     distortion_params: torch.Tensor,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,]:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Auxiliary function of radial_and_tangential_undistort() that computes residuals and jacobians.
     Adapted from MultiNeRF:
     https://github.com/google-research/multinerf/blob/b02228160d3179300c7d499dca28cb9ca3677f32/internal/camera_utils.py#L427-L474
@@ -446,7 +446,7 @@ def radial_and_tangential_undistort(
     return torch.stack([x, y], dim=-1)
 
 
-def rotation_matrix(a: Float[Tensor, "3"], b: Float[Tensor, "3"]) -> Float[Tensor, "3 3"]:
+def rotation_matrix_between(a: Float[Tensor, "3"], b: Float[Tensor, "3"]) -> Float[Tensor, "3 3"]:
     """Compute the rotation matrix that rotates vector a to vector b.
 
     Args:
@@ -457,13 +457,15 @@ def rotation_matrix(a: Float[Tensor, "3"], b: Float[Tensor, "3"]) -> Float[Tenso
     """
     a = a / torch.linalg.norm(a)
     b = b / torch.linalg.norm(b)
-    v = torch.cross(a, b)
-    c = torch.dot(a, b)
-    # If vectors are exactly opposite, we add a little noise to one of them
-    if c < -1 + 1e-8:
-        eps = (torch.rand(3) - 0.5) * 0.01
-        return rotation_matrix(a + eps, b)
-    s = torch.linalg.norm(v)
+    v = torch.linalg.cross(a, b)  # Axis of rotation.
+
+    # Handle cases where `a` and `b` are parallel.
+    eps = 1e-6
+    if torch.sum(torch.abs(v)) < eps:
+        x = torch.tensor([1.0, 0, 0]) if abs(a[0]) < eps else torch.tensor([0, 1.0, 0])
+        v = torch.linalg.cross(a, x)
+
+    v = v / torch.linalg.norm(v)
     skew_sym_mat = torch.Tensor(
         [
             [0, -v[2], v[1]],
@@ -471,7 +473,10 @@ def rotation_matrix(a: Float[Tensor, "3"], b: Float[Tensor, "3"]) -> Float[Tenso
             [-v[1], v[0], 0],
         ]
     )
-    return torch.eye(3) + skew_sym_mat + skew_sym_mat @ skew_sym_mat * ((1 - c) / (s**2 + 1e-8))
+    theta = torch.acos(torch.clip(torch.dot(a, b), -1, 1))
+
+    # Rodrigues rotation formula. https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
+    return torch.eye(3) + torch.sin(theta) * skew_sym_mat + (1 - torch.cos(theta)) * (skew_sym_mat @ skew_sym_mat)
 
 
 def focus_of_attention(poses: Float[Tensor, "*num_poses 4 4"], initial_focus: Float[Tensor, "3"]) -> Float[Tensor, "3"]:
@@ -609,7 +614,7 @@ def auto_orient_and_center_poses(
                 # re-normalize
                 up = up / torch.linalg.norm(up)
 
-        rotation = rotation_matrix(up, torch.Tensor([0, 0, 1]))
+        rotation = rotation_matrix_between(up, torch.Tensor([0, 0, 1]))
         transform = torch.cat([rotation, rotation @ -translation[..., None]], dim=-1)
         oriented_poses = transform @ poses
     elif method == "none":
@@ -720,7 +725,7 @@ def fisheye624_unproject_helper(uv, params, max_iters: int = 5):
     function so this solves an optimization problem using Newton's method to get
     the inverse.
     Inputs:
-        uv: BxNx3 tensor of 2D pixels to be projected
+        uv: BxNx2 tensor of 2D pixels to be unprojected
         params: Bx16 tensor of Fisheye624 parameters formatted like this:
                 [f_u f_v c_u c_v {k_0 ... k_5} {p_0 p_1} {s_0 s_1 s_2 s_3}]
                 or Bx15 tensor of Fisheye624 parameters formatted like this:

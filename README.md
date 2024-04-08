@@ -1,5 +1,3 @@
-# NeRFstudio fork for Stanford NAV Lab
-
 This is a fork of the [NeRFstudio](https://github.com/nerfstudio-project/nerfstudio/) repository. It is used in the construction of Neural City Maps, a project by the Stanford NAV Lab.
 
 This branch (adam/terrain) is used for the Neural Elevation Models (NEMo) project, for terrain mapping and path planning. The `terrain_nerf` folder contains the code for the `terrain-nerfacto` method, which implements NEMo (a combined radiance field and height field).

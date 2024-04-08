@@ -21,12 +21,18 @@ import dataclasses
 import functools
 import os
 import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
-from typing import Dict, List, Literal, Optional, Tuple, Type, cast, DefaultDict
-from collections import defaultdict
+from typing import DefaultDict, Dict, List, Literal, Optional, Tuple, Type, cast
+
 import torch
+from rich import box, style
+from rich.panel import Panel
+from rich.table import Table
+from torch.cuda.amp.grad_scaler import GradScaler
+
 from nerfstudio.configs.experiment_config import ExperimentConfig
 from nerfstudio.engine.callbacks import TrainingCallback, TrainingCallbackAttributes, TrainingCallbackLocation
 from nerfstudio.engine.optimizers import Optimizers
@@ -36,12 +42,8 @@ from nerfstudio.utils.decorators import check_eval_enabled, check_main_thread, c
 from nerfstudio.utils.misc import step_check
 from nerfstudio.utils.rich_utils import CONSOLE
 from nerfstudio.utils.writer import EventName, TimeWriter
-from nerfstudio.viewer_legacy.server.viewer_state import ViewerLegacyState
 from nerfstudio.viewer.viewer import Viewer as ViewerState
-from rich import box, style
-from rich.panel import Panel
-from rich.table import Table
-from torch.cuda.amp.grad_scaler import GradScaler
+from nerfstudio.viewer_legacy.server.viewer_state import ViewerLegacyState
 
 TRAIN_INTERATION_OUTPUT = Tuple[torch.Tensor, Dict[str, torch.Tensor], Dict[str, torch.Tensor]]
 TORCH_DEVICE = str
@@ -80,7 +82,7 @@ class TrainerConfig(ExperimentConfig):
     """Path to checkpoint file."""
     log_gradients: bool = False
     """Optionally log gradients during training"""
-    gradient_accumulation_steps: Dict = field(default_factory=lambda: {})
+    gradient_accumulation_steps: Dict[str, int] = field(default_factory=lambda: {})
     """Number of steps to accumulate gradients over. Contains a mapping of {param_group:num}"""
 
 
@@ -182,16 +184,14 @@ class Trainer:
                 train_lock=self.train_lock,
                 share=self.config.viewer.make_share_url,
             )
-            banner_messages = [f"Viewer at: {self.viewer_state.viewer_url}"]
+            banner_messages = self.viewer_state.viewer_info
         self._check_viewer_warnings()
 
         self._load_checkpoint()
 
         self.callbacks = self.pipeline.get_training_callbacks(
             TrainingCallbackAttributes(
-                optimizers=self.optimizers,
-                grad_scaler=self.grad_scaler,
-                pipeline=self.pipeline,
+                optimizers=self.optimizers, grad_scaler=self.grad_scaler, pipeline=self.pipeline, trainer=self
             )
         )
 
