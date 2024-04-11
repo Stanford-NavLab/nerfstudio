@@ -44,6 +44,7 @@ terrain_nerfacto = MethodSpecification(
                 hashgrid_sizes=(19,),
                 hashgrid_layers=(16,),
                 hashgrid_resolutions=((16, 512),),
+                num_dino_samples=12,
                 camera_optimizer=CameraOptimizerConfig(mode="SO3xR3")
             ),
         ),

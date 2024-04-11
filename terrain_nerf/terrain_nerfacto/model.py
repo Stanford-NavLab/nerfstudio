@@ -36,6 +36,7 @@ class TNerfModelConfig(NerfactoModelConfig):
     """
 
     _target: Type = field(default_factory=lambda: TNerfModel)
+    num_dino_samples: int = 24
     hashgrid_layers: Tuple[int] = (12, 12)
     hashgrid_resolutions: Tuple[Tuple[int]] = ((16, 128), (128, 512))
     hashgrid_sizes: Tuple[int] = (19, 19)
@@ -93,7 +94,7 @@ class TNerfModel(NerfactoModel):
         # Importance sampling from proposal distribution
         ray_samples, weights_list, ray_samples_list = self.proposal_sampler(ray_bundle, density_fns=self.density_fns)
 
-        # ==== added for heightcap ====
+        # ==== added for heightcap ==== #
         heightcap_field_outputs = self.field.get_heightcap_outputs(ray_samples)
         height = ray_samples.frustums.get_positions().detach()[..., 2][..., None]
         #ground_height = self.field.get_ground_height()
@@ -101,7 +102,7 @@ class TNerfModel(NerfactoModel):
         # Use full density field when computing height penalty
         height_density, _ = self.field.get_density(ray_samples, do_heightcap=False)
         height_weights = ray_samples.get_weights(height_density.detach())
-        # ==== added for heightcap ====
+        # ==== added for heightcap ==== #
 
         # Push the ray samples through the field
         field_outputs = self.field.forward(ray_samples, compute_normals=self.config.predict_normals)
@@ -155,6 +156,20 @@ class TNerfModel(NerfactoModel):
         # Render depth 
         for i in range(self.config.num_proposal_iterations):
             outputs[f"prop_depth_{i}"] = self.renderer_depth(weights=weights_list[i], ray_samples=ray_samples_list[i])
+
+        # ==== added for DINO field ==== #
+        dino_weights, best_ids = torch.topk(weights, self.config.num_dino_samples, dim=-2, sorted=False)
+
+        def gather_fn(tens):
+            return torch.gather(tens, -2, best_ids.expand(*best_ids.shape[:-1], tens.shape[-1]))
+
+        dataclass_fn = lambda dc: dc._apply_fn_to_fields(gather_fn, dataclass_fn)
+        dino_samples: RaySamples = ray_samples._apply_fn_to_fields(gather_fn, dataclass_fn)
+        
+        dino_field_outputs = self.field.get_dino_outputs(dino_samples)
+
+        outputs["dino"] = torch.sum(dino_weights * dino_field_outputs["dino"], dim=-2)
+        # ==== added for DINO field ==== #
 
         # Use depth to project to xyz point
         # depth = outputs["depth"]
@@ -228,5 +243,9 @@ class TNerfModel(NerfactoModel):
             # Temperature: starts at 0 and increases to 1
             # smoothness_loss = (1.0 - np.exp(-self.step*1e-10)) * torch.nanmean(torch.square(outputs["heightnet_dx"]) + torch.square(outputs["heightnet_dy"]))
             # loss_dict["height_smoothness_loss"] = smoothness_loss
+
+            dino_wt = 1.0 - np.exp(-self.step*1e-10)  
+            unreduced_dino = torch.nn.functional.mse_loss(outputs["dino"], batch["dino"], reduction="none")
+            loss_dict["dino_loss"] = dino_wt*unreduced_dino.sum(dim=-1).nanmean()
         
         return loss_dict
