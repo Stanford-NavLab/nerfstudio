@@ -1,8 +1,8 @@
 import typing
 
 import torch
-from regional_nerfacto.utils.dino_extractor import ViTExtractor
-from regional_nerfacto.utils.feature_dataloader import FeatureDataloader
+from terrain_nerfacto.utils.dino_extractor import ViTExtractor
+from terrain_nerfacto.utils.feature_dataloader import FeatureDataloader
 from tqdm import tqdm
 
 
