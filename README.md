@@ -6,10 +6,11 @@ This branch (adam/terrain) is used for the Neural Elevation Models (NEMo) projec
 
 ## Installation
 
-Follow the instructions for Nerfstudio installation [here](https://docs.nerf.studio/quickstart/installation.html) up to "Dependencies" (create conda environment and install PyTorch and dependencies). Afterwards, clone this repo and install the nerfstudio package from source:
+Follow the instructions for Nerfstudio installation [here](https://docs.nerf.studio/quickstart/installation.html) up to "Dependencies" (create conda environment and install PyTorch and dependencies). Afterwards, clone the repo, switch to this branch, and install the nerfstudio package from source:
 ```
 git clone https://github.com/Stanford-NavLab/nerfstudio.git
 cd nerfstudio
+git checkout adam/terrain
 pip install --upgrade pip setuptools
 pip install -e .
 ```
