@@ -1,13 +1,16 @@
-This is a fork of the [NeRFstudio](https://github.com/nerfstudio-project/nerfstudio/) repository. It is used in the construction of Neural City Maps, a project by the Stanford NAV Lab.
+# Nerfstudio fork for Stanford NAV Lab
+
+This is a fork of the [Nerfstudio](https://github.com/nerfstudio-project/nerfstudio/) repository. It is used in the construction of Neural City Maps, a project by the Stanford NAV Lab.
 
 This branch (adam/terrain) is used for the Neural Elevation Models (NEMo) project, for terrain mapping and path planning. The `terrain_nerf` folder contains the code for the `terrain-nerfacto` method, which implements NEMo (a combined radiance field and height field).
 
 ## Installation
 
-Follow the instructions for Nerfstudio installation [here](https://docs.nerf.studio/quickstart/installation.html) up to "Dependencies" (create conda environment and install PyTorch and dependencies). Afterwards, clone this repo and install the nerfstudio package from source:
+Follow the instructions for Nerfstudio installation [here](https://docs.nerf.studio/quickstart/installation.html) up to "Dependencies" (create conda environment and install PyTorch and dependencies). Afterwards, clone the repo, switch to this branch, and install the nerfstudio package from source:
 ```
 git clone https://github.com/Stanford-NavLab/nerfstudio.git
 cd nerfstudio
+git checkout adam/terrain
 pip install --upgrade pip setuptools
 pip install -e .
 ```
