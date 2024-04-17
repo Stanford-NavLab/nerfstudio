@@ -55,39 +55,31 @@ class TNerfField(NerfactoField):
 
         self.top_cutoff = 1.0   # Assume no density above cameras
 
-        self.height_net_arch = 'MLP'  # 'SIREN' or 'MLP'
-
-        if self.height_net_arch == 'SIREN':
-            self.height_net = Siren(in_features=2, out_features=1, hidden_features=256,
-                                    hidden_layers=3, outermost_linear=True)
-        elif self.height_net_arch == 'MLP':
-            # 2D positional encodings
-            self.encs2d = torch.nn.ModuleList(
-                [
-                    TNerfField._get_encoding(
-                        grid_resolutions[i][0], grid_resolutions[i][1], grid_layers[i], indim=2, hash_size=grid_sizes[i]
-                    )
-                    for i in range(len(grid_layers))
-                ]
-            )
-            
-            tot_out_dims_2d = sum([e.n_output_dims for e in self.encs2d])
-            
-            # Create a network that maps elevation z = f(x, y) for surface
-            # Input: ...x2, Output: ...x1
-            self.height_net = tcnn.Network(
-                n_input_dims=tot_out_dims_2d,
-                n_output_dims=1,
-                network_config={
-                    "otype": "CutlassMLP",
-                    "activation": "ReLU",   
-                    "output_activation": "None",
-                    "n_neurons": 256,
-                    "n_hidden_layers": 1,
-                },
-            )
-            # self.height_net = Siren(in_features=tot_out_dims_2d, out_features=1, hidden_features=256,
-            #                         hidden_layers=1, outermost_linear=True)
+        # 2D Height network
+        self.encs2d = torch.nn.ModuleList(
+            [
+                TNerfField._get_encoding(
+                    grid_resolutions[i][0], grid_resolutions[i][1], grid_layers[i], indim=2, hash_size=grid_sizes[i]
+                )
+                for i in range(len(grid_layers))
+            ]
+        )
+        
+        tot_out_dims_2d = sum([e.n_output_dims for e in self.encs2d])
+        
+        # Create a network that maps elevation z = f(x, y) for surface
+        # Input: ...x2, Output: ...x1
+        self.height_net = tcnn.Network(
+            n_input_dims=tot_out_dims_2d,
+            n_output_dims=1,
+            network_config={
+                "otype": "CutlassMLP",
+                "activation": "ReLU",   
+                "output_activation": "None",
+                "n_neurons": 256,
+                "n_hidden_layers": 1,
+            },
+        )
 
         # Create a single trainable variable to store ground height
         self.ground_height = torch.nn.Parameter(torch.tensor(0.0))
@@ -138,15 +130,10 @@ class TNerfField(NerfactoField):
             positions = SceneBox.get_normalized_positions(unnorm_positions, self.aabb)  # NOTE: what does this do?
         
         if do_heightcap:
-            if self.height_net_arch == 'SIREN':
-                x = positions.view(-1, 3)[:, :2]
-                heightcaps, coords = self.height_net(x)
-                heightcaps = heightcaps.view(*ray_samples.frustums.shape)
-            elif self.height_net_arch == 'MLP':
-                xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
-                x = torch.concat(xs, dim=-1)
+            xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
+            x = torch.concat(xs, dim=-1)
 
-                heightcaps = self.height_net(x).view(*ray_samples.frustums.shape)
+            heightcaps = self.height_net(x).view(*ray_samples.frustums.shape)
             ground_height = self.ground_height
         else:
             heightcaps = 10000.0 
@@ -179,48 +166,37 @@ class TNerfField(NerfactoField):
         
         return density, base_mlp_out
     
+
+    def get_ground_height(self):
+        return self.ground_height
+
     
-    # TODO: can we consolidate this with get_density?
     def get_heightcap_outputs(
         self, ray_samples: RaySamples) -> Dict[FieldHeadNames, Tensor]:
         outputs = {}
 
-        positions = ray_samples.frustums.get_positions().detach()
-        # positions = self.spatial_distortion(positions)
-        # positions = (positions + 2.0) / 4.0
-
-        # if self.height_net_arch == 'SIREN':
-        #     x = positions.view(-1, 3)[:, :2]
-        #     heightcap_pass, coords = self.height_net(x)
-        #     heightcap_pass = heightcap_pass.view(*ray_samples.frustums.shape, -1)
-        # elif self.height_net_arch == 'MLP':
-        #     xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
-        #     x = torch.concat(xs, dim=-1)
-
-        #     heightcap_pass = self.height_net(x).view(*ray_samples.frustums.shape, -1)
-
-        # outputs["heightcap"] = heightcap_pass
-        outputs["heightcap"] = self.positions_to_heights(positions)
+        positions = ray_samples.frustums.get_positions().detach()  # (N_rays, N_samples, 3)
+        positions_2d = positions[..., :2]                          # (N_rays, N_samples, 2)    
+        outputs["heightcap"] = self.positions_to_heights(positions_2d)
         
         return outputs
     
-    # TODO: clean-up / consolidate these methods
+
     def positions_to_heights(self, positions):
-        """Positions are 2D for now"""
+        """Get heights from positions
+        
+        positions : torch.Tensor (N_rays, N_samples, 2)
+            Tensor of 2D positions 
+        
+        """
         inp_shape = positions.shape
-        positions = torch.cat([positions, torch.zeros_like(positions[..., :1])], dim=-1)
-        positions = self.spatial_distortion(positions)
+        positions = self.spatial_distortion(positions)  
         positions = (positions + 2.0) / 4.0
 
-        if self.height_net_arch == 'SIREN':
-            x = positions.view(-1, 3)[:, :2]
-            heights, coords = self.height_net(x)
-            heights = heights.view(*inp_shape[:-1], -1)
-        elif self.height_net_arch == 'MLP':
-            xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
-            x = torch.concat(xs, dim=-1)
+        xs = [e(positions.view(-1, 2)) for e in self.encs2d]
+        x = torch.concat(xs, dim=-1)
 
-            heights = self.height_net(x).view(*inp_shape[:-1], -1)
+        heights = self.height_net(x).view(*inp_shape[:-1], -1)
         
         return heights
     
@@ -229,32 +205,20 @@ class TNerfField(NerfactoField):
         self, ray_samples: RaySamples) -> Dict[FieldHeadNames, Tensor]:
         outputs = {}
 
-        positions = ray_samples.frustums.get_positions().detach()
-        # positions = self.spatial_distortion(positions)
-        # positions = (positions + 2.0) / 4.0
-
-        # xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
-        # x = torch.concat(xs, dim=-1)
-
-        # dino_pass = self.dino_net(x).view(*ray_samples.frustums.shape, -1)
-        # outputs["dino"] = dino_pass
-        outputs["dino"] = self.positions_to_dino(positions)
+        positions = ray_samples.frustums.get_positions().detach()  # (N_rays, N_samples, 3)
+        positions_2d = positions[..., :2]                          # (N_rays, N_samples, 2)
+        outputs["dino"] = self.positions_to_dino(positions_2d)
 
         return outputs
-
-    
-    def get_ground_height(self):
-        return self.ground_height
     
     
     def positions_to_dino(self, positions):
-        """Positions are 2D for now"""
+        """Get DINO features from positions"""
         inp_shape = positions.shape
-        positions = torch.cat([positions, torch.zeros_like(positions[..., :1])], dim=-1)
         positions = self.spatial_distortion(positions)
         positions = (positions + 2.0) / 4.0
 
-        xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
+        xs = [e(positions.view(-1, 2)) for e in self.encs2d]
         x = torch.concat(xs, dim=-1)
 
         dino = self.dino_net(x).view(*inp_shape[:-1], -1)

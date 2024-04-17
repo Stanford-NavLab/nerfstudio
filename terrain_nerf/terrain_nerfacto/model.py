@@ -244,8 +244,8 @@ class TNerfModel(NerfactoModel):
             # smoothness_loss = (1.0 - np.exp(-self.step*1e-10)) * torch.nanmean(torch.square(outputs["heightnet_dx"]) + torch.square(outputs["heightnet_dy"]))
             # loss_dict["height_smoothness_loss"] = smoothness_loss
 
-            dino_wt = 1.0 - np.exp(-self.step*1e-10)  
+            dino_wt = 1.0 - np.exp(-self.step * 1e-10)  
             unreduced_dino = torch.nn.functional.mse_loss(outputs["dino"], batch["dino"], reduction="none")
-            loss_dict["dino_loss"] = dino_wt*unreduced_dino.sum(dim=-1).nanmean()
+            loss_dict["dino_loss"] = dino_wt * unreduced_dino.sum(dim=-1).nanmean()
         
         return loss_dict
