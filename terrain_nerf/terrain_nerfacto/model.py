@@ -82,7 +82,7 @@ class TNerfModel(NerfactoModel):
 
         self.tall_loss_factor = 1.0
         self.max_height = 1.0
-        self.quantile_frac = 0.9
+        self.quantile_frac = 0.95
         self.ground_forget_fac = 0.1
         
     def get_outputs(self, ray_bundle: RayBundle):
