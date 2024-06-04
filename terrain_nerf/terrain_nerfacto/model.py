@@ -202,29 +202,31 @@ class TNerfModel(NerfactoModel):
         # Hard penalty for height exceeding the camera height
         outputs["heightcap_net_output"] = torch.sum(height_weights.detach() * heightcap_field_outputs["heightcap"], dim=-2)
 
-            # Compute heightnet spatial derivatives
-            # - Sample some xy points, for each xy point, consider a small delta in x and y and compute the difference in height
-            # positions = ray_samples.frustums.get_positions().detach().clone()
-            # xy = positions[..., :2]
-            # init_shape = xy.shape
-            # xy = xy.reshape(-1, 2)
-            # h_xy = torch.zeros_like(xy)
-            # delta = 1e-4
-            # height_vals_cur = self.field.positions_to_heights(xy)
-            # for i in range(2):
-            #     delta_vec = torch.zeros_like(xy)
-            #     delta_vec[:, i] = delta
-            #     height_vals_pos = self.field.positions_to_heights(xy + delta_vec)
-            #     h_xy[:, i] = (height_vals_pos - height_vals_cur).reshape(-1) / (delta)
-            #     height_vals_pos.detach()
-            # h_xy = h_xy.reshape(*init_shape)
-            
-            # # Outlier rejection
-            # h_xy[h_xy > 1.0] = 0.0
-            # h_xy[h_xy < -1.0] = 0.0   
+        ## ==== SMOOTHNESS LOSS ==== ##
+        # Compute heightnet spatial derivatives
+        # - Sample some xy points, for each xy point, consider a small delta in x and y and compute the difference in height
+        positions = ray_samples.frustums.get_positions().detach().clone()
+        xy = positions[..., :2]
+        init_shape = xy.shape
+        xy = xy.reshape(-1, 2)
 
-            # outputs["heightnet_dx"] = h_xy[..., 0]
-            # outputs["heightnet_dy"] = h_xy[..., 1] 
+        h_xy = torch.zeros_like(xy)
+        delta = 1e-4
+        height_vals_cur = self.field.positions_to_heights(xy)
+        for i in range(2):
+            delta_vec = torch.zeros_like(xy)
+            delta_vec[:, i] = delta
+            height_vals_pos = self.field.positions_to_heights(xy + delta_vec)
+            h_xy[:, i] = (height_vals_pos - height_vals_cur).reshape(-1) / (delta)
+            height_vals_pos.detach()
+        h_xy = h_xy.reshape(*init_shape)
+        
+        # Outlier rejection
+        # h_xy[h_xy > 1.0] = 0.0
+        # h_xy[h_xy < -1.0] = 0.0   
+
+        outputs["heightnet_dx"] = h_xy[..., 0]
+        outputs["heightnet_dy"] = h_xy[..., 1] 
         
         return outputs
     
@@ -241,8 +243,9 @@ class TNerfModel(NerfactoModel):
             
             # Enforce heightnet smoothness loss
             # Temperature: starts at 0 and increases to 1
-            # smoothness_loss = (1.0 - np.exp(-self.step*1e-10)) * torch.nanmean(torch.square(outputs["heightnet_dx"]) + torch.square(outputs["heightnet_dy"]))
-            # loss_dict["height_smoothness_loss"] = smoothness_loss
+            smoothness_loss = (1.0 - np.exp(-self.step*1e-10)) * torch.nanmean(torch.square(outputs["heightnet_dx"]) + torch.square(outputs["heightnet_dy"]))
+            #smoothness_loss = 1e-3 * torch.nanmean(torch.square(outputs["heightnet_dx"]) + torch.square(outputs["heightnet_dy"]))
+            loss_dict["height_smoothness_loss"] = smoothness_loss
 
             dino_wt = 1.0 - np.exp(-self.step * 1e-10)  
             unreduced_dino = torch.nn.functional.mse_loss(outputs["dino"], batch["dino"], reduction="none")

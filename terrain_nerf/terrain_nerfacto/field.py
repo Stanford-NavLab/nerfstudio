@@ -183,9 +183,9 @@ class TNerfField(NerfactoField):
     
 
     def positions_to_heights(self, positions):
-        """Get heights from positions
+        """Get heights from 2D positions
         
-        positions : torch.Tensor (N_rays, N_samples, 2)
+        positions : torch.Tensor (..., 2)
             Tensor of 2D positions 
         
         """
@@ -213,7 +213,12 @@ class TNerfField(NerfactoField):
     
     
     def positions_to_dino(self, positions):
-        """Get DINO features from positions"""
+        """Get DINO features from 2D positions
+        
+        positions : torch.Tensor (..., 2)
+            Tensor of 2D positions
+        
+        """
         inp_shape = positions.shape
         positions = self.spatial_distortion(positions)
         positions = (positions + 2.0) / 4.0
