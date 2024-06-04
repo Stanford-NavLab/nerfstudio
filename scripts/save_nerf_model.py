@@ -21,11 +21,15 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('/home/navlab-exxact/NeRF/nerfstudio/outputs/GESSanJose/terrain-nerfacto/2024-03-15_161957/config.yml'))
 
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/RedRocks/terrain-nerfacto/2024-03-15_175147/config.yml'))  # RedRocks MLP sine
-config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/RedRocks/terrain-nerfacto/2024-03-15_194521/config.yml'))  # RedRocks MLP relu
+#config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/RedRocks/terrain-nerfacto/2024-03-15_194521/config.yml'))  # RedRocks MLP relu
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/GES_KT22/terrain-nerfacto/2024-03-15_203528/config.yml')) # KT22 MLP relu
 #config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/GES_KT22/terrain-nerfacto/2024-03-21_132915/config.yml'))  # GES Moon MLP relu
-config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/RedRocks/terrain-nerfacto/2024-04-11_160510/config.yml'))  # RedRocks w/DINO
-
+#config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/RedRocks/terrain-nerfacto/2024-04-11_160510/config.yml'))  # RedRocks w/DINO
+path = 'outputs/1080p/terrain-nerfacto/2024-06-03_223029'
+config, pipeline, checkpoint_path, _ = eval_setup(Path(path + '/config.yml'))  
+env_name = path.split('/')[1]
+torch.save(pipeline.model.field.encs2d[0].state_dict(), path + f'/{env_name}_encs.pth')
+torch.save(pipeline.model.field.height_net.state_dict(), path + f'/{env_name}_mlp.pth')
 
 # TODO: arg: model component options
 
@@ -39,32 +43,32 @@ config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/RedRocks/terrain
 
 # %% --------------------- Sample DINO feature field --------------------- %% #
 
-N = 512
-bound = 0.75
-XY_grid = torch.meshgrid(
-    torch.linspace(-bound, bound, N, device=device),
-    torch.linspace(-bound, bound, N, device=device),
-    indexing='xy'
-)
-XY_grid = torch.stack(XY_grid, dim=-1)
-positions = XY_grid.reshape(-1, 2)
+# N = 512
+# bound = 0.75
+# XY_grid = torch.meshgrid(
+#     torch.linspace(-bound, bound, N, device=device),
+#     torch.linspace(-bound, bound, N, device=device),
+#     indexing='xy'
+# )
+# XY_grid = torch.stack(XY_grid, dim=-1)
+# positions = XY_grid.reshape(-1, 2)
 
-xy = positions[:, :2].detach().cpu().numpy()
-x = xy[:,0] 
-y = xy[:,1] 
-dino_features = pipeline.model.field.positions_to_dino(positions).detach().cpu().numpy()
+# xy = positions[:, :2].detach().cpu().numpy()
+# x = xy[:,0] 
+# y = xy[:,1] 
+# dino_features = pipeline.model.field.positions_to_dino(positions).detach().cpu().numpy()
 
-dino_img = dino_features.reshape(N, N, -1)
-# Get the first 3 channels
-dino_img = dino_img[:, :, :3]
+# dino_img = dino_features.reshape(N, N, -1)
+# # Get the first 3 channels
+# dino_img = dino_img[:, :, :3]
 
-fig = px.imshow(dino_img)
-fig.update_layout(title='DINO Features', width=800, height=800)
-fig.update_layout(scene_aspectmode='data')
-fig.show()
+# fig = px.imshow(dino_img)
+# fig.update_layout(title='DINO Features', width=800, height=800)
+# fig.update_layout(scene_aspectmode='data')
+# fig.show()
 
-print("dino features shape: ", dino_features.shape)
-raise
+# print("dino features shape: ", dino_features.shape)
+# raise
 
 
 # %% --------------------- Sample heights --------------------- %% #

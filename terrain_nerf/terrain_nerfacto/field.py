@@ -56,12 +56,39 @@ class TNerfField(NerfactoField):
         self.top_cutoff = 1.0   # Assume no density above cameras
 
         # 2D Height network
+        # grid_layers = (16,)
+        # grid_sizes = (19,)
+        # grid_resolutions = ((16, 512),)
+        # self.encs2d = torch.nn.ModuleList(
+        #     [
+        #         TNerfField._get_encoding(
+        #             grid_resolutions[i][0], grid_resolutions[i][1], grid_layers[i], indim=2, hash_size=grid_sizes[i]
+        #         )
+        #         for i in range(len(grid_layers))
+        #     ]
+        # )
+        # self.encs2d = torch.nn.ModuleList(
+        #     [
+        #         TNerfField._get_encoding(
+        #             grid_resolutions[i][0], grid_resolutions[i][1], grid_layers[i], indim=2, hash_size=grid_sizes[i]
+        #         )
+        #         for i in range(len(grid_layers))
+        #     ]
+        # )
         self.encs2d = torch.nn.ModuleList(
             [
-                TNerfField._get_encoding(
-                    grid_resolutions[i][0], grid_resolutions[i][1], grid_layers[i], indim=2, hash_size=grid_sizes[i]
+                tcnn.Encoding(
+                    n_input_dims=2,
+                    encoding_config={
+                        "otype": "HashGrid",
+                        "n_levels": 8,
+                        "n_features_per_level": 8,
+                        "log2_hashmap_size": 19,
+                        "base_resolution": 16,
+                        "per_level_scale": 1.2599210739135742,
+                        "interpolation": "Smoothstep"
+                    },
                 )
-                for i in range(len(grid_layers))
             ]
         )
         
@@ -77,7 +104,7 @@ class TNerfField(NerfactoField):
                 "activation": "ReLU",   
                 "output_activation": "None",
                 "n_neurons": 256,
-                "n_hidden_layers": 1,
+                "n_hidden_layers": 3,
             },
         )
 
