@@ -158,17 +158,17 @@ class TNerfModel(NerfactoModel):
             outputs[f"prop_depth_{i}"] = self.renderer_depth(weights=weights_list[i], ray_samples=ray_samples_list[i])
 
         # ==== added for DINO field ==== #
-        dino_weights, best_ids = torch.topk(weights, self.config.num_dino_samples, dim=-2, sorted=False)
+        # dino_weights, best_ids = torch.topk(weights, self.config.num_dino_samples, dim=-2, sorted=False)
 
-        def gather_fn(tens):
-            return torch.gather(tens, -2, best_ids.expand(*best_ids.shape[:-1], tens.shape[-1]))
+        # def gather_fn(tens):
+        #     return torch.gather(tens, -2, best_ids.expand(*best_ids.shape[:-1], tens.shape[-1]))
 
-        dataclass_fn = lambda dc: dc._apply_fn_to_fields(gather_fn, dataclass_fn)
-        dino_samples: RaySamples = ray_samples._apply_fn_to_fields(gather_fn, dataclass_fn)
+        # dataclass_fn = lambda dc: dc._apply_fn_to_fields(gather_fn, dataclass_fn)
+        # dino_samples: RaySamples = ray_samples._apply_fn_to_fields(gather_fn, dataclass_fn)
         
-        dino_field_outputs = self.field.get_dino_outputs(dino_samples)
+        # dino_field_outputs = self.field.get_dino_outputs(dino_samples)
 
-        outputs["dino"] = torch.sum(dino_weights * dino_field_outputs["dino"], dim=-2)
+        # outputs["dino"] = torch.sum(dino_weights * dino_field_outputs["dino"], dim=-2)
         # ==== added for DINO field ==== #
 
         # Use depth to project to xyz point
@@ -205,28 +205,79 @@ class TNerfModel(NerfactoModel):
         ## ==== SMOOTHNESS LOSS ==== ##
         # Compute heightnet spatial derivatives
         # - Sample some xy points, for each xy point, consider a small delta in x and y and compute the difference in height
-        positions = ray_samples.frustums.get_positions().detach().clone()
-        xy = positions[..., :2]
-        init_shape = xy.shape
-        xy = xy.reshape(-1, 2)
 
-        h_xy = torch.zeros_like(xy)
-        delta = 1e-4
-        height_vals_cur = self.field.positions_to_heights(xy)
-        for i in range(2):
-            delta_vec = torch.zeros_like(xy)
-            delta_vec[:, i] = delta
-            height_vals_pos = self.field.positions_to_heights(xy + delta_vec)
-            h_xy[:, i] = (height_vals_pos - height_vals_cur).reshape(-1) / (delta)
-            height_vals_pos.detach()
-        h_xy = h_xy.reshape(*init_shape)
+        # TODO: if autograd 2nd derivative is not working, use finite differences (Laplacian kernel)
+        if self.training:
+            positions = ray_samples.frustums.get_positions().detach().clone()
+            xy = positions[..., :2]
+            init_shape = xy.shape
+            xy = xy.reshape(-1, 2)
+            xy.requires_grad = True
+            #print("xy.device: ", xy.device)
+
+            ## TESTING GRADIENTS ##
+            # x = torch.rand(1, 2, device=xy.device).requires_grad_(True)
+            # print("x.device: ", x.device) 
+            # self.field.nemo.to(xy.device)
+            z, grad = self.field.nemo.forward_with_grad(xy)
+            grad_2 = torch.autograd.grad(
+                grad,
+                xy,
+                torch.ones_like(grad, device=xy.device),
+                create_graph=False,
+                retain_graph=False,
+                only_inputs=True)[0]
+            #print("grad_2: ", grad_2)
+
+
+        # def h(xy):
+        #     return self.field.positions_to_heights(xy).sum()
+
+        # from torch.autograd.functional import hessian
+        # print(hessian(h, xy))
+
+        # Penalize change in gradient
+        # h_xxyy = torch.zeros(len(xy), 2, 2)
+        # delta = 1e-4
+
+        # with torch.enable_grad():
+        #     heights = self.field.positions_to_heights(xy)
+        #     grad = torch.autograd.grad(heights, xy, torch.ones_like(heights, device=xy.device), 
+        #                                create_graph=True, retain_graph=True, only_inputs=True)[0]
+        #     grad_2 = torch.autograd.grad(grad, xy, torch.ones_like(grad, device=xy.device),
+        #                                 create_graph=False, retain_graph=False, only_inputs=True)[0]
+        #     print("grad_2: ", grad_2.shape)
+
+        # for i in range(2):
+        #     delta_vec = torch.zeros_like(xy)
+        #     delta_vec[:, i] = delta
+        #     xy_delta = xy + delta_vec
+        #     heights_delta = self.field.positions_to_heights(xy_delta)
+        #     grad_delta = torch.autograd.grad(heights_delta.sum(), xy_delta, create_graph=True)[0]
+        #     h_xxyy[..., i] = (grad_delta - grad) / (delta)
+        #     heights_delta.detach()
+        # # h_xxyy = h_xxyy.reshape(*init_shape)
+        # outputs["height_grad_dx"] = h_xxyy[..., 0]
+        # outputs["height_grad_dy"] = h_xxyy[..., 1] 
+        #print("height_grad_dx: ", outputs["height_grad_dx"].shape, "height_grad_dy: ", outputs["height_grad_dy"].shape)
+
+        # h_xy = torch.zeros_like(xy)
+        # delta = 1e-4
+        # height_vals_cur = self.field.positions_to_heights(xy)
+        # for i in range(2):
+        #     delta_vec = torch.zeros_like(xy)
+        #     delta_vec[:, i] = delta
+        #     height_vals_pos = self.field.positions_to_heights(xy + delta_vec)
+        #     h_xy[:, i] = (height_vals_pos - height_vals_cur).reshape(-1) / (delta)
+        #     height_vals_pos.detach()
+        # h_xy = h_xy.reshape(*init_shape)
         
-        # Outlier rejection
-        # h_xy[h_xy > 1.0] = 0.0
-        # h_xy[h_xy < -1.0] = 0.0   
+        # # Outlier rejection
+        # # h_xy[h_xy > 1.0] = 0.0
+        # # h_xy[h_xy < -1.0] = 0.0   
 
-        outputs["heightnet_dx"] = h_xy[..., 0]
-        outputs["heightnet_dy"] = h_xy[..., 1] 
+        # outputs["heightnet_dx"] = h_xy[..., 0]
+        # outputs["heightnet_dy"] = h_xy[..., 1] 
         
         return outputs
     
@@ -243,12 +294,12 @@ class TNerfModel(NerfactoModel):
             
             # Enforce heightnet smoothness loss
             # Temperature: starts at 0 and increases to 1
-            smoothness_loss = (1.0 - np.exp(-self.step*1e-10)) * torch.nanmean(torch.square(outputs["heightnet_dx"]) + torch.square(outputs["heightnet_dy"]))
+            #smoothness_loss = (1.0 - np.exp(-self.step*1e-10)) * torch.nanmean(torch.square(outputs["height_grad_dx"]) + torch.square(outputs["height_grad_dy"]))
             #smoothness_loss = 1e-3 * torch.nanmean(torch.square(outputs["heightnet_dx"]) + torch.square(outputs["heightnet_dy"]))
-            loss_dict["height_smoothness_loss"] = smoothness_loss
+            #loss_dict["height_smoothness_loss"] = smoothness_loss
 
-            dino_wt = 1.0 - np.exp(-self.step * 1e-10)  
-            unreduced_dino = torch.nn.functional.mse_loss(outputs["dino"], batch["dino"], reduction="none")
-            loss_dict["dino_loss"] = dino_wt * unreduced_dino.sum(dim=-1).nanmean()
+            # dino_wt = 1.0 - np.exp(-self.step * 1e-10)  
+            # unreduced_dino = torch.nn.functional.mse_loss(outputs["dino"], batch["dino"], reduction="none")
+            # loss_dict["dino_loss"] = dino_wt * unreduced_dino.sum(dim=-1).nanmean()
         
         return loss_dict

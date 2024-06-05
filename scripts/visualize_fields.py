@@ -10,6 +10,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import torch
+from plotly.subplots import make_subplots
 
 from nerfstudio.utils.eval_utils import eval_setup
 
@@ -28,16 +29,20 @@ def grid_2d(N, bounds):
     return positions
 
 
-def vis_height_field(N=512, bounds=[-1., 1., -1., 1.]):
+def vis_height_field(N=512, bounds=[-1., 1., -1., 1.], gradients=False):
     """
     Visualize the height field of the terrain model.
     """
     positions = grid_2d(N, bounds)
+    if gradients:
+        positions.requires_grad = True
 
     xy = positions[:, :2].detach().cpu().numpy()
     x = xy[:,0] 
     y = xy[:,1] 
-    z = pipeline.model.field.positions_to_heights(positions).detach().cpu().numpy().flatten()
+    #heights = pipeline.model.field.positions_to_heights(positions)
+    heights = pipeline.model.field.nemo(positions)
+    z = heights.detach().cpu().numpy().flatten()
 
     print("Ground height: ", pipeline.model.field.ground_height)
     print("Min z: ", z.min())
@@ -47,6 +52,19 @@ def vis_height_field(N=512, bounds=[-1., 1., -1., 1.]):
     fig.update_layout(title='Elevation Model', width=1600, height=900)
     fig.update_layout(scene_aspectmode='data')
     fig.show()
+
+    if gradients:
+        grad = torch.autograd.grad(heights.sum(), positions, create_graph=True)[0]
+        x_grad = grad[:,0].reshape(N, N).detach().cpu().numpy()
+        y_grad = grad[:,1].reshape(N, N).detach().cpu().numpy()
+
+        grad_fig = make_subplots(rows=1, cols=2, subplot_titles=('X Gradient', 'Y Gradient'), horizontal_spacing=0.15)
+        grad_fig.add_trace(go.Heatmap(z=x_grad, colorbar=dict(len=1.05, x=0.44, y=0.5)), row=1, col=1)
+        grad_fig.add_trace(go.Heatmap(z=y_grad, colorbar=dict(len=1.05, x=1.01, y=0.5)), row=1, col=2)
+        grad_fig.update_layout(width=1300, height=600, scene_aspectmode='data')
+        grad_fig.show()
+    
+    return fig
 
 
 def vis_dino_features(N=512, bounds=[-1., 1., -1., 1.]):
@@ -89,5 +107,16 @@ if __name__ == '__main__':
 
     config, pipeline, checkpoint_path, _ = eval_setup(Path(config_path))
 
-    vis_height_field(N=512, bounds=0.75*np.array([-1., 1., -1., 1.]))
+    fig = vis_height_field(N=512, bounds=np.array([-.75, .45, -.6, .6]), gradients=True)
+
+    # Extract scene name from config_path
+    scene_name = config_path.split('/')[1]
+
+    # Get path up to config.yml
+    save_path = '/'.join(config_path.split('/')[:-1])
+
+    torch.save(pipeline.model.field.encs2d[0].state_dict(), f'{save_path}/{scene_name}_encs.pth')
+    torch.save(pipeline.model.field.height_net.state_dict(), f'{save_path}/{scene_name}_mlp.pth')
+    print("Saved weights to ", save_path)
+    fig.write_html(save_path + '/height_field.html')
 
