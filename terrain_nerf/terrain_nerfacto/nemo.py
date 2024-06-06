@@ -22,7 +22,7 @@ class Nemo(nn.Module):
                 "interpolation": "Smoothstep"
             }
         )
-        
+
         # n_neurons = 256
         # n_hidden_layers = 3
         # self.decoder = nn.Sequential(
@@ -33,6 +33,8 @@ class Nemo(nn.Module):
         #     nn.Linear(n_neurons, 1)
         # )
 
+        # tcnn MLP doesn't support double backwards pass
+        # However, torch MLP is much slower and causes cuda out of memory issues
         self.decoder = tcnn.Network(
             n_input_dims=self.encoder.n_output_dims,
             n_output_dims=1,

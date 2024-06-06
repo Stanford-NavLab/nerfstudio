@@ -63,7 +63,7 @@ def vis_height_field(N=512, bounds=[-1., 1., -1., 1.], gradients=False):
         grad_fig.update_layout(width=1300, height=600, scene_aspectmode='data')
         grad_fig.show()
     
-    return fig
+    return fig, grad_fig
 
 
 def vis_dino_features(N=512, bounds=[-1., 1., -1., 1.]):
@@ -106,7 +106,7 @@ if __name__ == '__main__':
 
     config, pipeline, checkpoint_path, _ = eval_setup(Path(config_path))
 
-    fig = vis_height_field(N=512, bounds=np.array([-.75, .45, -.6, .6]), gradients=True)
+    fig, grad_fig = vis_height_field(N=512, bounds=np.array([-.75, .45, -.6, .6]), gradients=True)
 
     # Extract scene name from config_path
     scene_name = config_path.split('/')[1]
@@ -119,4 +119,4 @@ if __name__ == '__main__':
     #torch.save(pipeline.model.field.nemo.state_dict(), f'{save_path}/{scene_name}.pth')
     print("Saved weights to ", save_path)
     fig.write_html(save_path + '/height_field.html')
-
+    grad_fig.write_html(save_path + '/gradients.html')

@@ -136,11 +136,7 @@ class TNerfField(NerfactoField):
         if do_heightcap:
             xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
             x = torch.concat(xs, dim=-1)
-
             heightcaps = self.height_net(x).view(*ray_samples.frustums.shape)
-            # positions_2d = positions[..., :2]
-            # encoded = self.nemo.encoder(positions_2d.view(-1, 2))
-            # heightcaps = self.nemo.decoder(encoded).view(*ray_samples.frustums.shape)
         else:
             heightcaps = 10000.0 
 
@@ -176,10 +172,9 @@ class TNerfField(NerfactoField):
 
         positions = ray_samples.frustums.get_positions().detach()  # (N_rays, N_samples, 3)
         positions_2d = positions[..., :2]                          # (N_rays, N_samples, 2)    
-        outputs["heightcap"] = self.positions_to_heights(positions_2d)
+        return self.positions_to_heights(positions_2d)
         # outputs["heightcap"] = self.nemo(positions_2d.view(-1, 2)).view(*positions.shape[:-1], -1)
-        
-        return outputs
+        #return outputs
     
 
     def positions_to_heights(self, positions):
