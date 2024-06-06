@@ -40,11 +40,10 @@ def vis_height_field(N=512, bounds=[-1., 1., -1., 1.], gradients=False):
     xy = positions[:, :2].detach().cpu().numpy()
     x = xy[:,0] 
     y = xy[:,1] 
-    #heights = pipeline.model.field.positions_to_heights(positions)
-    heights = pipeline.model.field.nemo(positions)
+    heights = pipeline.model.field.positions_to_heights(positions)
+    #heights = pipeline.model.field.nemo(positions)
     z = heights.detach().cpu().numpy().flatten()
 
-    print("Ground height: ", pipeline.model.field.ground_height)
     print("Min z: ", z.min())
     print("Max z: ", z.max())
 
@@ -117,6 +116,7 @@ if __name__ == '__main__':
 
     torch.save(pipeline.model.field.encs2d[0].state_dict(), f'{save_path}/{scene_name}_encs.pth')
     torch.save(pipeline.model.field.height_net.state_dict(), f'{save_path}/{scene_name}_mlp.pth')
+    #torch.save(pipeline.model.field.nemo.state_dict(), f'{save_path}/{scene_name}.pth')
     print("Saved weights to ", save_path)
     fig.write_html(save_path + '/height_field.html')
 

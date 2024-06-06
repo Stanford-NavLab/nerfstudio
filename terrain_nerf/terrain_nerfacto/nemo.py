@@ -23,34 +23,37 @@ class Nemo(nn.Module):
             }
         )
         
-        n_neurons = 256
-        n_hidden_layers = 3
-        self.decoder = nn.Sequential(
-            nn.Linear(self.encoder.n_output_dims, n_neurons),
-            nn.ReLU(True),
-            nn.Linear(n_neurons, n_neurons),
-            nn.ReLU(True),
-            nn.Linear(n_neurons, 1)
-        )
-        # self.decoder = tcnn.Network(
-        #     n_input_dims=self.encoder.n_output_dims,
-        #     n_output_dims=1,
-        #     network_config={
-        #         "otype": "CutlassMLP",
-        #         "activation": "ReLU",   
-        #         "output_activation": "None",
-        #         "n_neurons": 256,
-        #         "n_hidden_layers": 3,
-        #     },
+        # n_neurons = 256
+        # n_hidden_layers = 3
+        # self.decoder = nn.Sequential(
+        #     nn.Linear(self.encoder.n_output_dims, n_neurons),
+        #     nn.ReLU(True),
+        #     nn.Linear(n_neurons, n_neurons),
+        #     nn.ReLU(True),
+        #     nn.Linear(n_neurons, 1)
         # )
 
+        self.decoder = tcnn.Network(
+            n_input_dims=self.encoder.n_output_dims,
+            n_output_dims=1,
+            network_config={
+                "otype": "CutlassMLP",
+                "activation": "ReLU",   
+                "output_activation": "None",
+                "n_neurons": 256,
+                "n_hidden_layers": 3,
+            },
+        )
+
     def forward(self, x):
-        inp_shape = x.shape
-        # x = self.spatial_distortion(x)  
-        # x = (x + 2.0) / 4.0
-        encoded = self.encoder(x.view(-1, 2)).to(dtype=torch.float)
+        """
+        x : torch.Tensor (N, 2)
+        """
+        x = self.spatial_distortion(x)  
+        x = (x + 2.0) / 4.0
+        encoded = self.encoder(x)
         z = self.decoder(encoded)
-        return z.view(*inp_shape[:-1], -1)
+        return z
 
     def forward_with_grad(self, x):
         with torch.enable_grad():

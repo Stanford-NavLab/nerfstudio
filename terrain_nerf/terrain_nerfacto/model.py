@@ -97,7 +97,6 @@ class TNerfModel(NerfactoModel):
         # ==== added for heightcap ==== #
         heightcap_field_outputs = self.field.get_heightcap_outputs(ray_samples)
         height = ray_samples.frustums.get_positions().detach()[..., 2][..., None]
-        #ground_height = self.field.get_ground_height()
 
         # Use full density field when computing height penalty
         height_density, _ = self.field.get_density(ray_samples, do_heightcap=False)
@@ -207,26 +206,26 @@ class TNerfModel(NerfactoModel):
         # - Sample some xy points, for each xy point, consider a small delta in x and y and compute the difference in height
 
         # TODO: if autograd 2nd derivative is not working, use finite differences (Laplacian kernel)
-        if self.training:
-            positions = ray_samples.frustums.get_positions().detach().clone()
-            xy = positions[..., :2]
-            init_shape = xy.shape
-            xy = xy.reshape(-1, 2)
-            xy.requires_grad = True
-            #print("xy.device: ", xy.device)
+        # if self.training:
+        #     positions = ray_samples.frustums.get_positions().detach().clone()
+        #     xy = positions[..., :2]
+        #     init_shape = xy.shape
+        #     xy = xy.reshape(-1, 2)
+        #     xy.requires_grad = True
+        #     #print("xy.device: ", xy.device)
 
-            ## TESTING GRADIENTS ##
-            # x = torch.rand(1, 2, device=xy.device).requires_grad_(True)
-            # print("x.device: ", x.device) 
-            # self.field.nemo.to(xy.device)
-            z, grad = self.field.nemo.forward_with_grad(xy)
-            grad_2 = torch.autograd.grad(
-                grad,
-                xy,
-                torch.ones_like(grad, device=xy.device),
-                create_graph=False,
-                retain_graph=False,
-                only_inputs=True)[0]
+        #     ## TESTING GRADIENTS ##
+        #     # x = torch.rand(1, 2, device=xy.device).requires_grad_(True)
+        #     # print("x.device: ", x.device) 
+        #     # self.field.nemo.to(xy.device)
+        #     z, grad = self.field.nemo.forward_with_grad(xy)
+        #     grad_2 = torch.autograd.grad(
+        #         grad,
+        #         xy,
+        #         torch.ones_like(grad, device=xy.device),
+        #         create_graph=False,
+        #         retain_graph=False,
+        #         only_inputs=True)[0]
             #print("grad_2: ", grad_2)
 
 
@@ -281,6 +280,7 @@ class TNerfModel(NerfactoModel):
         
         return outputs
     
+
     def get_loss_dict(self, outputs, batch, metrics_dict=None):
         loss_dict = super().get_loss_dict(outputs, batch, metrics_dict)
 

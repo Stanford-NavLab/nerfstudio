@@ -54,63 +54,39 @@ class TNerfField(NerfactoField):
         
         """
         # 2D Height network
-        # grid_layers = (16,)
-        # grid_sizes = (19,)
-        # grid_resolutions = ((16, 512),)
-        # self.encs2d = torch.nn.ModuleList(
-        #     [
-        #         TNerfField._get_encoding(
-        #             grid_resolutions[i][0], grid_resolutions[i][1], grid_layers[i], indim=2, hash_size=grid_sizes[i]
-        #         )
-        #         for i in range(len(grid_layers))
-        #     ]
-        # )
-        # self.encs2d = torch.nn.ModuleList(
-        #     [
-        #         TNerfField._get_encoding(
-        #             grid_resolutions[i][0], grid_resolutions[i][1], grid_layers[i], indim=2, hash_size=grid_sizes[i]
-        #         )
-        #         for i in range(len(grid_layers))
-        #     ]
-        # )
-        self.nemo = Nemo(spatial_distortion=self.spatial_distortion, hash=True)
-
-
-        # self.encs2d = torch.nn.ModuleList(
-        #     [
-        #         tcnn.Encoding(
-        #             n_input_dims=2,
-        #             encoding_config={
-        #                 "otype": "HashGrid",
-        #                 "n_levels": 8,
-        #                 "n_features_per_level": 8,
-        #                 "log2_hashmap_size": 19,
-        #                 "base_resolution": 16,
-        #                 "per_level_scale": 1.2599210739135742,
-        #                 "interpolation": "Smoothstep"
-        #             },
-        #         )
-        #     ]
-        # )
+        # self.nemo = Nemo(spatial_distortion=self.spatial_distortion, hash=True)
+        self.encs2d = torch.nn.ModuleList(
+            [
+                tcnn.Encoding(
+                    n_input_dims=2,
+                    encoding_config={
+                        "otype": "HashGrid",
+                        "n_levels": 8,
+                        "n_features_per_level": 8,
+                        "log2_hashmap_size": 19,
+                        "base_resolution": 16,
+                        "per_level_scale": 1.2599210739135742,
+                        "interpolation": "Smoothstep"
+                    },
+                )
+            ]
+        )
         
-        # tot_out_dims_2d = sum([e.n_output_dims for e in self.encs2d])
+        tot_out_dims_2d = sum([e.n_output_dims for e in self.encs2d])
         
-        # # Create a network that maps elevation z = f(x, y) for surface
-        # # Input: ...x2, Output: ...x1
-        # self.height_net = tcnn.Network(
-        #     n_input_dims=tot_out_dims_2d,
-        #     n_output_dims=1,
-        #     network_config={
-        #         "otype": "CutlassMLP",
-        #         "activation": "ReLU",   
-        #         "output_activation": "None",
-        #         "n_neurons": 256,
-        #         "n_hidden_layers": 3,
-        #     },
-        # )
-
-        # Create a single trainable variable to store ground height
-        self.ground_height = torch.nn.Parameter(torch.tensor(0.0))
+        # Create a network that maps elevation z = f(x, y) for surface
+        # Input: ...x2, Output: ...x1
+        self.height_net = tcnn.Network(
+            n_input_dims=tot_out_dims_2d,
+            n_output_dims=1,
+            network_config={
+                "otype": "CutlassMLP",
+                "activation": "ReLU",   
+                "output_activation": "None",
+                "n_neurons": 256,
+                "n_hidden_layers": 3,
+            },
+        )
 
         # 2D DINO network
         # self.dino_net = tcnn.Network(
@@ -151,28 +127,26 @@ class TNerfField(NerfactoField):
         """
         if self.spatial_distortion is not None:
             unnorm_positions = ray_samples.frustums.get_positions()
-            positions = self.spatial_distortion(unnorm_positions)  # Spatial distortion squeezes into -2 to 2
+            positions = self.spatial_distortion(unnorm_positions)  # Spatial distortion squeezes into -2 to 2 box
             positions = (positions + 2.0) / 4.0                    # Normalize to 0 to 1
         else:
             unnorm_positions = ray_samples.frustums.get_positions()
             positions = SceneBox.get_normalized_positions(unnorm_positions, self.aabb)  # NOTE: what does this do?
         
         if do_heightcap:
-            # xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
-            # x = torch.concat(xs, dim=-1)
+            xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
+            x = torch.concat(xs, dim=-1)
 
-            # heightcaps = self.height_net(x).view(*ray_samples.frustums.shape)
-            heightcaps = self.nemo(positions.view(-1, 3)[:, :2]).view(*ray_samples.frustums.shape)
-            ground_height = self.ground_height
+            heightcaps = self.height_net(x).view(*ray_samples.frustums.shape)
+            # positions_2d = positions[..., :2]
+            # encoded = self.nemo.encoder(positions_2d.view(-1, 2))
+            # heightcaps = self.nemo.decoder(encoded).view(*ray_samples.frustums.shape)
         else:
             heightcaps = 10000.0 
-            ground_height = -10000.0
 
         selector_0 = (unnorm_positions[..., 2] <= -0.25)
         # Selector to mask out positions with z higher than heightcaps
         selector_0 = selector_0 & (unnorm_positions[..., 2] <= heightcaps)
-        #selector_0 = (unnorm_positions[..., 2] <= heightcaps) & (unnorm_positions[..., 2] >= ground_height) # Navlab added
-        #selector_0 = True
         
         # ------ Standard Nerfstudio masking ------ #
         selector = selector_0 & ((positions > 0.0) & (positions < 1.0)).all(dim=-1)
@@ -194,10 +168,6 @@ class TNerfField(NerfactoField):
         # ------ Standard Nerfstudio masking ------ #
         
         return density, base_mlp_out
-    
-
-    def get_ground_height(self):
-        return self.ground_height
 
     
     def get_heightcap_outputs(
@@ -206,29 +176,29 @@ class TNerfField(NerfactoField):
 
         positions = ray_samples.frustums.get_positions().detach()  # (N_rays, N_samples, 3)
         positions_2d = positions[..., :2]                          # (N_rays, N_samples, 2)    
-        #outputs["heightcap"] = self.positions_to_heights(positions_2d)
-        outputs["heightcap"] = self.nemo(positions_2d)
+        outputs["heightcap"] = self.positions_to_heights(positions_2d)
+        # outputs["heightcap"] = self.nemo(positions_2d.view(-1, 2)).view(*positions.shape[:-1], -1)
         
         return outputs
     
 
-    # def positions_to_heights(self, positions):
-    #     """Get heights from 2D positions
+    def positions_to_heights(self, positions):
+        """Get heights from 2D positions
         
-    #     positions : torch.Tensor (..., 2)
-    #         Tensor of 2D positions 
+        positions : torch.Tensor (..., 2)
+            Tensor of 2D positions 
         
-    #     """
-    #     inp_shape = positions.shape
-    #     positions = self.spatial_distortion(positions)  
-    #     positions = (positions + 2.0) / 4.0
+        """
+        inp_shape = positions.shape
+        positions = self.spatial_distortion(positions)  
+        positions = (positions + 2.0) / 4.0
 
-    #     xs = [e(positions.view(-1, 2)) for e in self.encs2d]
-    #     x = torch.concat(xs, dim=-1)
+        xs = [e(positions.view(-1, 2)) for e in self.encs2d]
+        x = torch.concat(xs, dim=-1)
 
-    #     heights = self.height_net(x).view(*inp_shape[:-1], -1)
+        heights = self.height_net(x).view(*inp_shape[:-1], -1)
         
-    #     return heights
+        return heights
     
     
     # def get_dino_outputs(
