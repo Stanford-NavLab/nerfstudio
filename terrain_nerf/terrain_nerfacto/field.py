@@ -13,6 +13,7 @@ from torch import Tensor
 from nerfstudio.cameras.rays import RaySamples
 from nerfstudio.data.scene_box import SceneBox
 from nerfstudio.field_components.activations import trunc_exp
+from nerfstudio.field_components.encodings import HashEncoding
 from nerfstudio.field_components.field_heads import FieldHeadNames
 from nerfstudio.field_components.spatial_distortions import SpatialDistortion
 from nerfstudio.fields.base_field import Field  # for custom Field
@@ -55,9 +56,31 @@ class TNerfField(NerfactoField):
         """
         # 2D Height network
         # self.nemo = Nemo(spatial_distortion=self.spatial_distortion, hash=True)
-        self.encs2d = torch.nn.ModuleList(
-            [
-                tcnn.Encoding(
+        # self.encs2d = torch.nn.ModuleList(
+        #     [
+        #         tcnn.Encoding(
+        #             n_input_dims=2,
+        #             encoding_config={
+        #                 "otype": "HashGrid",
+        #                 "n_levels": 8,
+        #                 "n_features_per_level": 8,
+        #                 "log2_hashmap_size": 19,
+        #                 "base_resolution": 16,
+        #                 "per_level_scale": 1.2599210739135742,
+        #                 "interpolation": "Smoothstep"
+        #             },
+        #         )
+        #     ]
+        # )
+        # self.encoder = HashEncoding(num_levels=8,
+        #                             features_per_level=8,
+        #                             log2_hashmap_size=19,
+        #                             interpolation="Smoothstep")
+        # self.encoder = TNerfField._get_encoding(start_res=16, 
+        #                                         end_res=512, 
+        #                                         levels=8)
+        # print(self.encoder.encoding_config)
+        self.encoder = tcnn.Encoding(
                     n_input_dims=2,
                     encoding_config={
                         "otype": "HashGrid",
@@ -69,10 +92,8 @@ class TNerfField(NerfactoField):
                         "interpolation": "Smoothstep"
                     },
                 )
-            ]
-        )
-        
-        tot_out_dims_2d = sum([e.n_output_dims for e in self.encs2d])
+        #tot_out_dims_2d = sum([e.n_output_dims for e in self.encs2d])
+        tot_out_dims_2d = self.encoder.n_output_dims
         
         # Create a network that maps elevation z = f(x, y) for surface
         # Input: ...x2, Output: ...x1
@@ -101,11 +122,11 @@ class TNerfField(NerfactoField):
         #     },
         # )
 
-    @staticmethod
-    def _get_encoding(start_res, end_res, levels, indim=3, hash_size=19):
+    # @staticmethod
+    def _get_encoding(start_res, end_res, levels, hash_size=19):
         growth = np.exp((np.log(end_res) - np.log(start_res)) / (levels - 1))
         enc = tcnn.Encoding(
-            n_input_dims=indim,
+            n_input_dims=2,
             encoding_config={
                 "otype": "HashGrid",
                 "n_levels": levels,
@@ -113,6 +134,7 @@ class TNerfField(NerfactoField):
                 "log2_hashmap_size": hash_size,
                 "base_resolution": start_res,
                 "per_level_scale": growth,
+                "interpolation": "Smoothstep"
             },
         )
         return enc
@@ -134,8 +156,9 @@ class TNerfField(NerfactoField):
             positions = SceneBox.get_normalized_positions(unnorm_positions, self.aabb)  # NOTE: what does this do?
         
         if do_heightcap:
-            xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
-            x = torch.concat(xs, dim=-1)
+            # xs = [e(positions.view(-1, 3)[:, :2]) for e in self.encs2d]
+            # x = torch.concat(xs, dim=-1)
+            x = self.encoder(positions.view(-1, 3)[:, :2])
             heightcaps = self.height_net(x).view(*ray_samples.frustums.shape)
         else:
             heightcaps = 10000.0 
@@ -188,8 +211,9 @@ class TNerfField(NerfactoField):
         positions = self.spatial_distortion(positions)  
         positions = (positions + 2.0) / 4.0
 
-        xs = [e(positions.view(-1, 2)) for e in self.encs2d]
-        x = torch.concat(xs, dim=-1)
+        # xs = [e(positions.view(-1, 2)) for e in self.encs2d]
+        # x = torch.concat(xs, dim=-1)
+        x = self.encoder(positions.view(-1, 2))
 
         heights = self.height_net(x).view(*inp_shape[:-1], -1)
         

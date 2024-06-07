@@ -114,9 +114,15 @@ if __name__ == '__main__':
     # Get path up to config.yml
     save_path = '/'.join(config_path.split('/')[:-1])
 
-    torch.save(pipeline.model.field.encs2d[0].state_dict(), f'{save_path}/{scene_name}_encs.pth')
+    print(pipeline.model.field.encoder.encoding_config)
+
+    torch.save(pipeline.model.field.encoder.state_dict(), f'{save_path}/{scene_name}_encs.pth')
     torch.save(pipeline.model.field.height_net.state_dict(), f'{save_path}/{scene_name}_mlp.pth')
     #torch.save(pipeline.model.field.nemo.state_dict(), f'{save_path}/{scene_name}.pth')
     print("Saved weights to ", save_path)
     fig.write_html(save_path + '/height_field.html')
     grad_fig.write_html(save_path + '/gradients.html')
+
+    # Create a txt file called description.txt
+    with open(save_path + '/description.txt', 'w') as f:
+        pass
