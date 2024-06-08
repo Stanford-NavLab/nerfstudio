@@ -116,6 +116,7 @@ if __name__ == '__main__':
 
     print(pipeline.model.field.encoder.encoding_config)
 
+
     torch.save(pipeline.model.field.encoder.state_dict(), f'{save_path}/{scene_name}_encs.pth')
     torch.save(pipeline.model.field.height_net.state_dict(), f'{save_path}/{scene_name}_mlp.pth')
     #torch.save(pipeline.model.field.nemo.state_dict(), f'{save_path}/{scene_name}.pth')
