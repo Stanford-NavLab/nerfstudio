@@ -24,7 +24,9 @@ from torch import Tensor
 
 from nerfstudio.utils import colors
 
-Colormaps = Literal["default", "turbo", "viridis", "magma", "inferno", "cividis", "gray", "pca"]
+# Colormaps = Literal["default", "turbo", "viridis", "magma", "inferno", "cividis", "gray", "pca"]
+# [NAV Lab] Set Viridis as the default colormap rather than turbo
+Colormaps = Literal["default", "viridis", "turbo", "magma", "inferno", "cividis", "gray", "gist_ncar", "viridis_ends", "pca"]
 
 
 @dataclass(frozen=True)
@@ -101,7 +103,9 @@ def apply_float_colormap(image: Float[Tensor, "*bs 1"], colormap: Colormaps = "v
         Tensor: Colored image with colors in [0, 1]
     """
     if colormap == "default":
-        colormap = "turbo"
+        # colormap = "turbo"
+        # This condition usually does not get called since the colormap options already ignores "default"
+        colormap = "viridis"
 
     image = torch.nan_to_num(image, 0)
     if colormap == "gray":
@@ -111,7 +115,23 @@ def apply_float_colormap(image: Float[Tensor, "*bs 1"], colormap: Colormaps = "v
     image_long_max = torch.max(image_long)
     assert image_long_min >= 0, f"the min value is {image_long_min}"
     assert image_long_max <= 255, f"the max value is {image_long_max}"
-    return torch.tensor(matplotlib.colormaps[colormap].colors, device=image.device)[image_long[..., 0]]
+    # return torch.tensor(matplotlib.colormaps[colormap].colors, device=image.device)[image_long[..., 0]]
+
+    # [NAV Lab]
+    if colormap in matplotlib.colormaps:
+        cmap_obj = matplotlib.colormaps[colormap]
+        if isinstance(cmap_obj, matplotlib.colors.ListedColormap):
+            # (Typical Nerfstudio)
+            return torch.tensor(matplotlib.colormaps[colormap].colors, device=image.device)[image_long[..., 0]]
+        else:
+            # Allow access to other color maps using the normal matplotlib interface
+            return torch.tensor(matplotlib.colormaps[colormap](range(256)), device=image.device)[image_long[..., 0], :3]
+    elif "ends" in colormap:
+        # We need to remove the ends and set to white
+        colormap_split = colormap.split("_")
+        base_colormap = matplotlib.colormaps[colormap_split[0]]
+        return torch.tensor(base_colormap(range(256)), device=image.device)[image_long[..., 0], :3]
+
 
 
 def apply_depth_colormap(
