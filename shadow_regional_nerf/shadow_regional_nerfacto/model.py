@@ -162,7 +162,7 @@ class SRNerfModel(MRNerfModel):
             # print(f"From Sum Density: ({torch.min(outputs["sum_density"])}, {torch.max(outputs["sum_density"])})")
 
         #############
-        # Minimal Regional NeRF
+        # Shadow Regional NeRF
 
         # If nerf_from_enu_coords is not None, visualize the nerf_from_enu_coords (i.e., user query point)
         if self.nerf_from_enu_coords is not None:

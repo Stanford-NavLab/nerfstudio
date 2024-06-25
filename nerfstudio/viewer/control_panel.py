@@ -82,8 +82,8 @@ class ControlPanel:
         self._normalize = ViewerCheckbox(
             "Normalize", True, cb_hook=lambda _: rerender_cb(), hint="Normalize the colormap"
         )
-        self._min = ViewerNumber("Min", 0.0, cb_hook=lambda _: rerender_cb(), hint="Min value of the colormap")
-        self._max = ViewerNumber("Max", 1.0, cb_hook=lambda _: rerender_cb(), hint="Max value of the colormap")
+        self._min = ViewerNumber("Min", 0.000001, cb_hook=lambda _: rerender_cb(), hint="Min value of the colormap (MODIFIED)")
+        self._max = ViewerNumber("Max", 1.000001, cb_hook=lambda _: rerender_cb(), hint="Max value of the colormap (MODIFIED)")
 
         self._split = ViewerCheckbox(
             "Enable",
@@ -112,10 +112,10 @@ class ControlPanel:
             "Normalize ", True, cb_hook=lambda _: rerender_cb(), hint="Normalize the colormap of the second output"
         )
         self._split_min = ViewerNumber(
-            "Min ", 0.0, cb_hook=lambda _: rerender_cb(), hint="Min value of the colormap of the second output"
+            "Min ", 0.000001, cb_hook=lambda _: rerender_cb(), hint="Min value of the colormap of the second output (MODIFIED)"
         )
         self._split_max = ViewerNumber(
-            "Max ", 1.0, cb_hook=lambda _: rerender_cb(), hint="Max value of the colormap of the second output"
+            "Max ", 1.000001, cb_hook=lambda _: rerender_cb(), hint="Max value of the colormap of the second output (MODIFIED)"
         )
 
         self._train_util = ViewerSlider(
