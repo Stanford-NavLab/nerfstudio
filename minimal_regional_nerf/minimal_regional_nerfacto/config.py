@@ -59,5 +59,5 @@ minimal_regional_nerfacto = MethodSpecification(
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
         vis="viewer",
     ),
-    description="[NAVLab] Minimal Regional Nerf method.",
+    description="[NAVLab] Minimal Regional NeRF method.",
 )

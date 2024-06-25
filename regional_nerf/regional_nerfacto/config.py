@@ -60,5 +60,5 @@ regional_nerfacto = MethodSpecification(
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
         vis="viewer",
     ),
-    description="[NAVLab] Regional Nerf method.",
+    description="[NAVLab] Regional NeRF method (Heritage).",
 )
