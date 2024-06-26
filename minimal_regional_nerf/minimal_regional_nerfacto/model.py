@@ -90,6 +90,7 @@ class MRNerfModel(NerfactoModel):
         self.latlon_str = None
         self.latlon_setter = ViewerButton(name="Set Lat/Lon", 
                                           cb_hook=self.latlon_set)
+        self.latlon_highlight_radius = 0.05 # NeRF Units!
 
         self.nerf_from_enu_coords = None
 
@@ -206,6 +207,9 @@ class MRNerfModel(NerfactoModel):
         for i in range(self.config.num_proposal_iterations):
             outputs[f"prop_depth_{i}"] = self.renderer_depth(weights=weights_list[i], ray_samples=ray_samples_list[i])
 
+        #############
+        # Minimal Regional NeRF Part (Manually inherited)
+
         # If nerf_from_enu_coords is not None, visualize the nerf_from_enu_coords (i.e., user query point)
         if self.nerf_from_enu_coords is not None:
             xy = ray_samples.frustums.get_positions()[..., :2].detach()
@@ -214,8 +218,7 @@ class MRNerfModel(NerfactoModel):
             nerf_from_enu_coords = self.nerf_from_enu_coords[:2].unsqueeze(0).expand_as(xy)
             
             # If xy is within epsilon of the NeRF ENU coords, set mask to 1 else 0
-            cylinder_radius = 0.05
-            mask = (torch.norm(xy - nerf_from_enu_coords, dim=-1) < cylinder_radius).unsqueeze(-1)
+            mask = (torch.norm(xy - nerf_from_enu_coords, dim=-1) < self.latlon_highlight_radius).unsqueeze(-1)
             
             outputs["enu_vis_masked"] = 0.5*torch.sum(weights * mask, dim=-2) + 0.5*rgb
         

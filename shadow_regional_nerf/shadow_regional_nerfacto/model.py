@@ -162,7 +162,7 @@ class SRNerfModel(MRNerfModel):
             # print(f"From Sum Density: ({torch.min(outputs["sum_density"])}, {torch.max(outputs["sum_density"])})")
 
         #############
-        # Shadow Regional NeRF
+        # Minimal Regional NeRF Part (Manually inherited)
 
         # If nerf_from_enu_coords is not None, visualize the nerf_from_enu_coords (i.e., user query point)
         if self.nerf_from_enu_coords is not None:
@@ -170,11 +170,63 @@ class SRNerfModel(MRNerfModel):
             
             # Convert nerf_from_enu_coords to same shape as xy
             nerf_from_enu_coords = self.nerf_from_enu_coords[:2].unsqueeze(0).expand_as(xy)
-            
+
             # If xy is within epsilon of the NeRF ENU coords, set mask to 1 else 0
             cylinder_radius = 0.05
-            mask = (torch.norm(xy - nerf_from_enu_coords, dim=-1) < cylinder_radius).unsqueeze(-1)
+            lla_mask = (torch.norm(xy - nerf_from_enu_coords, dim=-1) < cylinder_radius).unsqueeze(-1)
             
-            outputs["enu_vis_masked"] = 0.5*torch.sum(weights * mask, dim=-2) + 0.5*rgb
+            outputs["enu_vis_masked"] = 0.5*torch.sum(weights * lla_mask, dim=-2) + 0.5*rgb
+
+        #############
+        # Satellites
+
+        with torch.no_grad():
+            # The directions can be between -1 and 1. We want to convert this to 
+            # 0 to 1. Hence, +1 to get 0 to 2 and /2 to get 0 to 1
+            outputs["directions"] = (ray_bundle.directions + 1) / 2
+
+            # Test satellites; these will move to "self"
+            test_sat = torch.tensor(
+                [[1.0, 0.0, 0.0], 
+                 [0.0, 1.0, 0.0],
+                 [0.11043, 0.99388, 0.0],
+                 [0.936329, 0.0, -0.351123]], 
+                device=rgb.device)
+            
+            
+            # sat_dot = ray_bundle.directions[:, None, :] * test_sat[None, :, :]
+            # # print(f"sat_dot shape:  ", sat_dot.shape)
+            # sat_mask = torch.sum(sat_dot, dim=-1) > 0.98
+            # print("sat_mask shape:           ", sat_mask.shape)
+            # print("sat_mask shape unsqueeze: ", sat_mask.unsqueeze(-1).shape)
+
+            # We expand the axes to match [# rays, # sats, 3D]
+            # So, the rays will be        [# rays,      1,  3]
+            # and the satellites will be  [     1, # sats,  3]
+            # We then want to do a dot product (element-wise multiply & sum) over 
+            # the direction (i.e., 3D, which is the last axis).
+            # This leaves [# rays, # sats]
+            # Lastly, we check if any satellites will mask the ray and hence
+            # reduce the satellite dimension, leaving [# rays, 1] with keepdim
+            sat_cos_angular = 0.98
+            sat_bool_mask = torch.any(
+                torch.sum(
+                    ray_bundle.directions[:, None, :] * test_sat[None, :, :], 
+                    dim=-1) > sat_cos_angular,
+                dim=-1, keepdim=True)
+            
+            
+            # print("accumulation shape:       ", accumulation.shape)
+            # print("accumulation type:", accumulation.dtype)
+            # sat_mask_uint = sat_mask.to(torch.uint8)
+            # sat_mask_across = torch.sum(sat_mask_uint, dim=-1).unsqueeze(-1)
+
+            # print("final sat_mask shape:     ", sat_mask_across.shape)
+            # print("final sat_mask: ", sat_mask_across)
+
+            outputs["satellite"] = sat_bool_mask.to(accumulation.dtype)
+
+
+        
         
         return outputs
