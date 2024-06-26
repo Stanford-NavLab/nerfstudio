@@ -26,7 +26,11 @@ from nerfstudio.utils import colors
 
 # Colormaps = Literal["default", "turbo", "viridis", "magma", "inferno", "cividis", "gray", "pca"]
 # [NAV Lab] Set Viridis as the default colormap rather than turbo
-Colormaps = Literal["default", "viridis", "turbo", "magma", "inferno", "cividis", "gray", "gist_ncar", "viridis_ends", "pca"]
+Colormaps = Literal["default", "viridis", "turbo", "magma", "inferno", "cividis", "gray", 
+                    "gist_ncar", 
+                    "viridis-ends", "turbo-ends", "magma-ends", "inferno-ends", "cividis-ends", "gray-ends",
+                    "gist_ncar-ends",
+                    "pca"]
 
 
 @dataclass(frozen=True)
@@ -120,17 +124,26 @@ def apply_float_colormap(image: Float[Tensor, "*bs 1"], colormap: Colormaps = "v
     # [NAV Lab]
     if colormap in matplotlib.colormaps:
         cmap_obj = matplotlib.colormaps[colormap]
-        if isinstance(cmap_obj, matplotlib.colors.ListedColormap):
-            # (Typical Nerfstudio)
-            return torch.tensor(matplotlib.colormaps[colormap].colors, device=image.device)[image_long[..., 0]]
+    else:
+        colormap_front = colormap.split("-")[0]
+        if colormap_front in colormap:
+            cmap_obj = matplotlib.colormaps[colormap_front]
         else:
-            # Allow access to other color maps using the normal matplotlib interface
-            return torch.tensor(matplotlib.colormaps[colormap](range(256)), device=image.device)[image_long[..., 0], :3]
-    elif "ends" in colormap:
-        # We need to remove the ends and set to white
-        colormap_split = colormap.split("_")
-        base_colormap = matplotlib.colormaps[colormap_split[0]]
-        return torch.tensor(base_colormap(range(256)), device=image.device)[image_long[..., 0], :3]
+            raise NotImplementedError(f"Requested colormap {colormap} is not supported.")
+    
+    if isinstance(cmap_obj, matplotlib.colors.ListedColormap):
+        # (Typical Nerfstudio, which only supports 'ListedColormap')
+        cmap_colors = torch.tensor(cmap_obj.colors)
+    else:
+        # Allow access to other color maps using the normal matplotlib interface
+        cmap_colors = torch.tensor(cmap_obj(range(256)))[:, :3]
+
+    if "ends" in colormap:
+        # We need to remove the ends and set to black
+        cmap_colors[ :1, :] = 0.0
+        cmap_colors[-1:, :] = 0.1
+    
+    return cmap_colors.to(image.device)[image_long[..., 0]]
 
 
 
