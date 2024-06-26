@@ -49,7 +49,7 @@ class SRNerfField(MRNerfField):
         self.top_cutoff = 1.0
 
         print("---------------------------")
-        print("FINISHED FIELD")
+        print("[SRNeRF Field] FINISHED FIELD")
 
     def set_enu_transform(self, **kwargs):
         for key, value in kwargs.items():

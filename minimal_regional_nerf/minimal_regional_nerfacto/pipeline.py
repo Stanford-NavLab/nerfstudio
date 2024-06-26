@@ -68,7 +68,7 @@ class MRNerfPipeline(VanillaPipeline):
         # print(self.datamanager)
         self.datamanager.to(device)
         print("----------------------------------------------------")
-        print(f"[MRNeRF Pipeline] Data manager that is on GPU: {device}")
+        print(f"[MRNeRF Pipeline] Data manager that is on GPU: {device} = {self.datamanager.device}")
         # print(self.datamanager)
 
         assert self.datamanager.train_dataset is not None, "Missing input dataset"
@@ -97,7 +97,7 @@ class MRNerfPipeline(VanillaPipeline):
         print("[MRNeRF Pipeline] Sending model to GPU")
         self.model.to(device)
         print("----------------------------------------------------")
-        print(f"[MRNeRF Pipeline] Model is on GPU: {device}")
+        print(f"[MRNeRF Pipeline] Model is on GPU: {device} = {self.model.device}")
 
         # Run the ENU setting callback now that the device is on the GPU
         # In particular, we need both model and datamanager on the same device

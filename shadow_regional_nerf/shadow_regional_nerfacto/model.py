@@ -3,7 +3,7 @@ Shadow Regional Nerfacto Model File
 
 Currently this subclasses the Nerfacto model. Consider subclassing from the base Model.
 """
-# import math
+import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Type
 
@@ -85,6 +85,15 @@ class SRNerfModel(MRNerfModel):
 
         # This will get set when Pipeline calls "set_enu_transforms"
         self.nerf_from_enu_coords = None
+
+        # For plotting the satellites
+        self.satellite_cos_angular = math.cos(math.radians(5))
+        # Not sure if we should set a device at this point
+        self.satellite_directions = torch.tensor(
+                [[1.0, 0.0, 0.0], 
+                 [0.0, 1.0, 0.0],
+                 [0.11043, 0.99388, 0.0],
+                 [0.936329, 0.0, -0.351123]])
 
 
     def get_outputs(self, ray_bundle: RayBundle):
@@ -185,21 +194,6 @@ class SRNerfModel(MRNerfModel):
             # 0 to 1. Hence, +1 to get 0 to 2 and /2 to get 0 to 1
             outputs["directions"] = (ray_bundle.directions + 1) / 2
 
-            # Test satellites; these will move to "self"
-            test_sat = torch.tensor(
-                [[1.0, 0.0, 0.0], 
-                 [0.0, 1.0, 0.0],
-                 [0.11043, 0.99388, 0.0],
-                 [0.936329, 0.0, -0.351123]], 
-                device=rgb.device)
-            
-            
-            # sat_dot = ray_bundle.directions[:, None, :] * test_sat[None, :, :]
-            # # print(f"sat_dot shape:  ", sat_dot.shape)
-            # sat_mask = torch.sum(sat_dot, dim=-1) > 0.98
-            # print("sat_mask shape:           ", sat_mask.shape)
-            # print("sat_mask shape unsqueeze: ", sat_mask.unsqueeze(-1).shape)
-
             # We expand the axes to match [# rays, # sats, 3D]
             # So, the rays will be        [# rays,      1,  3]
             # and the satellites will be  [     1, # sats,  3]
@@ -211,18 +205,9 @@ class SRNerfModel(MRNerfModel):
             sat_cos_angular = 0.98
             sat_bool_mask = torch.any(
                 torch.sum(
-                    ray_bundle.directions[:, None, :] * test_sat[None, :, :], 
-                    dim=-1) > sat_cos_angular,
+                    ray_bundle.directions[:, None, :] * self.satellite_directions[None, :, :], 
+                    dim=-1) > self.satellite_cos_angular,
                 dim=-1, keepdim=True)
-            
-            
-            # print("accumulation shape:       ", accumulation.shape)
-            # print("accumulation type:", accumulation.dtype)
-            # sat_mask_uint = sat_mask.to(torch.uint8)
-            # sat_mask_across = torch.sum(sat_mask_uint, dim=-1).unsqueeze(-1)
-
-            # print("final sat_mask shape:     ", sat_mask_across.shape)
-            # print("final sat_mask: ", sat_mask_across)
 
             outputs["satellite"] = sat_bool_mask.to(accumulation.dtype)
 
