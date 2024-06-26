@@ -88,7 +88,11 @@ class SRNerfModel(MRNerfModel):
         self.nerf_from_enu_coords = None
 
         # For operations with the satellites
-        self.satellite_cos_angular = math.cos(math.radians(5))
+        half_angle_of_disk = 1 # deg
+        inner_disk_factor = 2/3 # fraction removed
+        half_angle_inner_disk = inner_disk_factor * half_angle_of_disk
+        self.satellite_cos_disk = math.cos(math.radians(half_angle_of_disk))
+        self.satellite_cos_disk_inner = math.cos(math.radians(half_angle_inner_disk))
         # Not sure if we should set a device at this point
         self.satellite_directions = torch.tensor(
                 [[1.0, 0.0, 0.0], 
@@ -97,7 +101,7 @@ class SRNerfModel(MRNerfModel):
                  [0.936329, 0.0, -0.351123]])
 
         # For plotting the satellites
-        self.output_satellites = False
+        self.output_satellites = True
         self.use_satellites_reader = ViewerCheckbox("Show Satellites", 
                                                     self.output_satellites, 
                                                     cb_hook=self.satellites_cb, 
@@ -223,18 +227,21 @@ class SRNerfModel(MRNerfModel):
                 # We then want to do a dot product (element-wise multiply & sum) over 
                 # the direction (i.e., 3D, which is the last axis).
                 # This leaves [# rays, # sats]
+                sat_bool_mask_inner = torch.sum(
+                    ray_bundle.directions[:, None, :] * self.satellite_directions[None, :, :], 
+                    dim=-1) < self.satellite_cos_disk_inner
+                sat_bool_mask_outer = torch.sum(
+                    ray_bundle.directions[:, None, :] * self.satellite_directions[None, :, :], 
+                    dim=-1) > self.satellite_cos_disk
+                
                 # Lastly, we check if any satellites will mask the ray and hence
                 # reduce the satellite dimension, leaving [# rays, 1] with keepdim
-                sat_cos_angular = 0.98
                 sat_bool_mask = torch.any(
-                    torch.sum(
-                        ray_bundle.directions[:, None, :] * self.satellite_directions[None, :, :], 
-                        dim=-1) > self.satellite_cos_angular,
+                    torch.logical_and(sat_bool_mask_inner, sat_bool_mask_outer),
                     dim=-1, keepdim=True)
 
-                outputs["satellite_only"] = sat_bool_mask.to(accumulation.dtype)
+                outputs["satellite_mask"] = sat_bool_mask.to(accumulation.dtype)
 
-
-        
+                outputs["rgb_mask"] = 0.5*sat_bool_mask + 0.5*rgb
         
         return outputs

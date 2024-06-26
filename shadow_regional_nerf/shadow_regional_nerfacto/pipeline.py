@@ -69,7 +69,6 @@ class SRNerfPipeline(MRNerfPipeline):
         print("---------------------------")
         print(f"[SRNeRF Pipeline] Sending satellites to GPU: {device}")
         self.model.satellite_directions = self.model.satellite_directions.to(device)
-        print(self.model.satellite_directions)
 
         print("---------------------------")
         print("[SRNeRF Pipeline] Complete\n")
