@@ -76,6 +76,7 @@ class SRNerfModel(MRNerfModel):
             implementation=self.config.implementation,
         )
 
+        # For plotting the lat/lon values with ENU masked
         self.latlon_reader = ViewerText("Lat, Lon", 
                                         "", 
                                         cb_hook=self.latlon_cb,
@@ -86,7 +87,7 @@ class SRNerfModel(MRNerfModel):
         # This will get set when Pipeline calls "set_enu_transforms"
         self.nerf_from_enu_coords = None
 
-        # For plotting the satellites
+        # For operations with the satellites
         self.satellite_cos_angular = math.cos(math.radians(5))
         # Not sure if we should set a device at this point
         self.satellite_directions = torch.tensor(
@@ -94,6 +95,26 @@ class SRNerfModel(MRNerfModel):
                  [0.0, 1.0, 0.0],
                  [0.11043, 0.99388, 0.0],
                  [0.936329, 0.0, -0.351123]])
+
+        # For plotting the satellites
+        self.output_satellites = False
+        self.use_satellites_reader = ViewerCheckbox("Show Satellites", 
+                                                    self.output_satellites, 
+                                                    cb_hook=self.satellites_cb, 
+                                                    hint="Overlay the satellites")
+
+    def satellites_cb(self, element):
+        """
+        Waits for toggle
+
+        Parameters:
+        --------------
+        element
+            Viewer element (e.g., the button)
+        """
+        # Change the button text box value
+        
+        self.output_satellites = element.value
 
 
     def get_outputs(self, ray_bundle: RayBundle):
@@ -173,7 +194,8 @@ class SRNerfModel(MRNerfModel):
         #############
         # Minimal Regional NeRF Part (Manually inherited)
 
-        # If nerf_from_enu_coords is not None, visualize the nerf_from_enu_coords (i.e., user query point)
+        # If nerf_from_enu_coords is not None, visualize the nerf_from_enu_coords 
+        # (i.e., user query point)
         if self.nerf_from_enu_coords is not None:
             xy = ray_samples.frustums.get_positions()[..., :2].detach()
             
@@ -189,27 +211,28 @@ class SRNerfModel(MRNerfModel):
         #############
         # Satellites
 
-        with torch.no_grad():
-            # The directions can be between -1 and 1. We want to convert this to 
-            # 0 to 1. Hence, +1 to get 0 to 2 and /2 to get 0 to 1
-            outputs["directions"] = (ray_bundle.directions + 1) / 2
+        if self.output_satellites:
+            with torch.no_grad():
+                # The directions can be between -1 and 1. We want to convert this to 
+                # 0 to 1. Hence, +1 to get 0 to 2 and /2 to get 0 to 1
+                outputs["directions"] = (ray_bundle.directions + 1) / 2
 
-            # We expand the axes to match [# rays, # sats, 3D]
-            # So, the rays will be        [# rays,      1,  3]
-            # and the satellites will be  [     1, # sats,  3]
-            # We then want to do a dot product (element-wise multiply & sum) over 
-            # the direction (i.e., 3D, which is the last axis).
-            # This leaves [# rays, # sats]
-            # Lastly, we check if any satellites will mask the ray and hence
-            # reduce the satellite dimension, leaving [# rays, 1] with keepdim
-            sat_cos_angular = 0.98
-            sat_bool_mask = torch.any(
-                torch.sum(
-                    ray_bundle.directions[:, None, :] * self.satellite_directions[None, :, :], 
-                    dim=-1) > self.satellite_cos_angular,
-                dim=-1, keepdim=True)
+                # We expand the axes to match [# rays, # sats, 3D]
+                # So, the rays will be        [# rays,      1,  3]
+                # and the satellites will be  [     1, # sats,  3]
+                # We then want to do a dot product (element-wise multiply & sum) over 
+                # the direction (i.e., 3D, which is the last axis).
+                # This leaves [# rays, # sats]
+                # Lastly, we check if any satellites will mask the ray and hence
+                # reduce the satellite dimension, leaving [# rays, 1] with keepdim
+                sat_cos_angular = 0.98
+                sat_bool_mask = torch.any(
+                    torch.sum(
+                        ray_bundle.directions[:, None, :] * self.satellite_directions[None, :, :], 
+                        dim=-1) > self.satellite_cos_angular,
+                    dim=-1, keepdim=True)
 
-            outputs["satellite"] = sat_bool_mask.to(accumulation.dtype)
+                outputs["satellite_only"] = sat_bool_mask.to(accumulation.dtype)
 
 
         
