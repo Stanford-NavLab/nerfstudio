@@ -27,9 +27,9 @@ from nerfstudio.utils import colors
 # Colormaps = Literal["default", "turbo", "viridis", "magma", "inferno", "cividis", "gray", "pca"]
 # [NAV Lab] Set Viridis as the default colormap rather than turbo
 Colormaps = Literal["default", "viridis", "turbo", "magma", "inferno", "cividis", "gray", 
-                    "gist_ncar", 
+                    "gist_ncar", "prism", 
                     "viridis-ends", "turbo-ends", "magma-ends", "inferno-ends", "cividis-ends", "gray-ends",
-                    "gist_ncar-ends",
+                    "gist_ncar-ends", "prism-ends",
                     "pca"]
 
 
@@ -76,8 +76,16 @@ def apply_colormap(
     if image.shape[-1] == 1 and torch.is_floating_point(image):
         output = image
         if colormap_options.normalize:
-            output = output - torch.min(output)
-            output = output / (torch.max(output) + eps)
+            # [NAV Lab] allow +- infinity
+            finite_output_mask = torch.isfinite(output)
+            finite_min = torch.min(output[finite_output_mask])
+            finite_max = torch.max(output[finite_output_mask])
+
+            output = output - finite_min
+            output = output / (finite_max + eps)
+
+            # output = output - torch.min(output)
+            # output = output / (torch.max(output) + eps)
         output = (
             output * (colormap_options.colormap_max - colormap_options.colormap_min) + colormap_options.colormap_min
         )
@@ -141,7 +149,7 @@ def apply_float_colormap(image: Float[Tensor, "*bs 1"], colormap: Colormaps = "v
     if "ends" in colormap:
         # We need to remove the ends and set to black
         cmap_colors[ :1, :] = 0.0
-        cmap_colors[-1:, :] = 0.1
+        cmap_colors[-1:, :] = 0.5
     
     return cmap_colors.to(image.device)[image_long[..., 0]]
 

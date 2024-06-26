@@ -93,6 +93,7 @@ class SRNerfModel(MRNerfModel):
         half_angle_inner_disk = inner_disk_factor * half_angle_of_disk
         self.satellite_cos_disk = math.cos(math.radians(half_angle_of_disk))
         self.satellite_cos_disk_inner = math.cos(math.radians(half_angle_inner_disk))
+        self.satellite_disk_edge = 2e-5
         # Not sure if we should set a device at this point
         self.satellite_directions = torch.tensor(
                 [[1.0, 0.0, 0.0], 
@@ -235,13 +236,28 @@ class SRNerfModel(MRNerfModel):
                     dim=-1) > self.satellite_cos_disk
                 
                 # Lastly, we check if any satellites will mask the ray and hence
-                # reduce the satellite dimension, leaving [# rays, 1] with keepdim
+                # reduce the satellite dimension, leaving [# rays]
                 sat_bool_mask = torch.any(
                     torch.logical_and(sat_bool_mask_inner, sat_bool_mask_outer),
-                    dim=-1, keepdim=True)
+                    dim=-1) #, keepdim=True)
 
-                outputs["satellite_mask"] = sat_bool_mask.to(accumulation.dtype)
+                # Repeat for the edge
+                sat_bool_mask_inner_edge = torch.sum(
+                    ray_bundle.directions[:, None, :] * self.satellite_directions[None, :, :], 
+                    dim=-1) < self.satellite_cos_disk_inner + self.satellite_disk_edge
+                sat_bool_mask_outer_edge = torch.sum(
+                    ray_bundle.directions[:, None, :] * self.satellite_directions[None, :, :], 
+                    dim=-1) > self.satellite_cos_disk - self.satellite_disk_edge
+                sat_bool_mask_edge = torch.any(
+                    torch.logical_and(sat_bool_mask_inner_edge, sat_bool_mask_outer_edge),
+                    dim=-1)
 
-                outputs["rgb_mask"] = 0.5*sat_bool_mask + 0.5*rgb
+                # outputs["rgb_mask"] = 0.5*sat_bool_mask + 0.5*rgb
+                for output_key, output_value in outputs.items():
+                    # 1.0 for edge, 0.0 for base
+                    outputs[output_key][sat_bool_mask_edge] = torch.inf
+                    outputs[output_key][sat_bool_mask] = -torch.inf
+
+                outputs["satellite_mask"] = sat_bool_mask.to(accumulation.dtype).unsqueeze(-1)
         
         return outputs
