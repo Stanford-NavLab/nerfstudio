@@ -95,11 +95,21 @@ class SRNerfModel(MRNerfModel):
         self.satellite_cos_disk_inner = math.cos(math.radians(half_angle_inner_disk))
         self.satellite_disk_edge = 2e-5
         # Not sure if we should set a device at this point
+        sqrt_3 = math.sqrt(3)
         self.satellite_directions = torch.tensor(
                 [[1.0, 0.0, 0.0], 
                  [0.0, 1.0, 0.0],
                  [0.11043, 0.99388, 0.0],
-                 [0.936329, 0.0, -0.351123]])
+                 [0.936329, 0.0, -0.351123],
+                 [0.0, 0.0, -1.0],
+                 [ 1/sqrt_3,  1/sqrt_3, -1/sqrt_3],
+                 [-1/sqrt_3,  1/sqrt_3, -1/sqrt_3],
+                 [ 1/sqrt_3, -1/sqrt_3, -1/sqrt_3],
+                 [-1/sqrt_3, -1/sqrt_3, -1/sqrt_3],
+                 [ 1/sqrt_3,  1/sqrt_3,  1/sqrt_3],
+                 [-1/sqrt_3,  1/sqrt_3,  1/sqrt_3],
+                 [ 1/sqrt_3, -1/sqrt_3,  1/sqrt_3],
+                 [-1/sqrt_3, -1/sqrt_3,  1/sqrt_3]])
 
         # For plotting the satellites
         self.output_satellites = True
@@ -107,6 +117,22 @@ class SRNerfModel(MRNerfModel):
                                                     self.output_satellites, 
                                                     cb_hook=self.satellites_cb, 
                                                     hint="Overlay the satellites")
+        print("[SRNeRF Model] Satellites viewable? ", self.output_satellites)
+
+        # For operations with the horizon
+        horizon_half_angle = 1
+        inner_horizon_factor = 2/3
+        inner_horizon_half_angle = inner_horizon_factor * horizon_half_angle
+        self.horizon_sin_half_angle = math.sin(math.radians(horizon_half_angle))
+        self.horizon_sin_half_angle_inner = math.sin(math.radians(inner_horizon_half_angle))
+
+        # For plotting the horizon
+        self.output_horizon = True
+        self.use_horizon_reader = ViewerCheckbox("Show Horizon", 
+                                                    self.output_horizon, 
+                                                    cb_hook=self.horizon_cb, 
+                                                    hint="Overlay the horizon")
+        print("[SRNeRF Model] Horizon viewable?    ", self.output_horizon)
 
     def satellites_cb(self, element):
         """
@@ -121,6 +147,19 @@ class SRNerfModel(MRNerfModel):
         
         self.output_satellites = element.value
 
+
+    def horizon_cb(self, element):
+        """
+        Waits for toggle
+
+        Parameters:
+        --------------
+        element
+            Viewer element (e.g., the button)
+        """
+        # Change the button text box value
+        
+        self.output_horizon = element.value
 
     def get_outputs(self, ray_bundle: RayBundle):
         """
@@ -214,6 +253,37 @@ class SRNerfModel(MRNerfModel):
             outputs["enu_vis_masked"] = 0.5*torch.sum(weights * lla_mask, dim=-2) + 0.5*rgb
 
         #############
+        # Horizon
+
+        if self.output_horizon:
+            with torch.no_grad():
+                # Render the horizon similar to the satellites, but as a band
+                horizon_mask = torch.abs(
+                    ray_bundle.directions[:, 2]
+                ) < self.horizon_sin_half_angle_inner
+
+                horizon_mask_edge = torch.abs(
+                    ray_bundle.directions[:, 2]
+                ) < self.horizon_sin_half_angle
+
+                print("Horizon mask shape: ", horizon_mask.shape)
+                print("Inner condition:  ", self.horizon_sin_half_angle_inner)
+                print("Outer condition:  ", self.horizon_sin_half_angle)
+                print("Horizon num True:   ", horizon_mask.sum())
+                print("Edge    num True:   ", horizon_mask_edge.sum())
+                # print(horizon_mask)
+
+                for output_key, output_value in outputs.items():
+                    # 0.0 for edge, 1.0 for base
+                    if "mask" not in output_key:
+                        # print("Adding horizon to: ", output_key)
+                        outputs[output_key][horizon_mask_edge] = -torch.inf
+                        outputs[output_key][horizon_mask]      =  torch.inf
+
+                outputs["horizon_mask"] = horizon_mask.to(accumulation.dtype).unsqueeze(-1)
+
+
+        #############
         # Satellites
 
         if self.output_satellites:
@@ -252,11 +322,11 @@ class SRNerfModel(MRNerfModel):
                     torch.logical_and(sat_bool_mask_inner_edge, sat_bool_mask_outer_edge),
                     dim=-1)
 
-                # outputs["rgb_mask"] = 0.5*sat_bool_mask + 0.5*rgb
                 for output_key, output_value in outputs.items():
                     # 1.0 for edge, 0.0 for base
-                    outputs[output_key][sat_bool_mask_edge] = torch.inf
-                    outputs[output_key][sat_bool_mask] = -torch.inf
+                    if "mask" not in output_key:
+                        outputs[output_key][sat_bool_mask_edge] =  torch.inf
+                        outputs[output_key][sat_bool_mask]      = -torch.inf
 
                 outputs["satellite_mask"] = sat_bool_mask.to(accumulation.dtype).unsqueeze(-1)
         
