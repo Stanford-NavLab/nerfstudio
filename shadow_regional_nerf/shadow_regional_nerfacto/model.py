@@ -88,18 +88,18 @@ class SRNerfModel(MRNerfModel):
         self.nerf_from_enu_coords = None
 
         # For operations with the satellites
-        half_angle_of_disk = 1 # deg
-        inner_disk_factor = 2/3 # fraction removed
+        half_angle_of_disk = 2 # deg
+        inner_disk_factor = 3/4 # fraction removed
         half_angle_inner_disk = inner_disk_factor * half_angle_of_disk
         self.satellite_cos_disk = math.cos(math.radians(half_angle_of_disk))
         self.satellite_cos_disk_inner = math.cos(math.radians(half_angle_inner_disk))
-        self.satellite_disk_edge = 2e-5
-        # Not sure if we should set a device at this point
-        sqrt_3 = math.sqrt(3)
+        self.satellite_disk_edge = 2e-4
 
         ######################################
         # For testing purposes only
         ######################################
+        # Not sure if we should set a device at this point
+        # sqrt_3 = math.sqrt(3)
         # self.satellite_directions = torch.tensor(
         #         [[1.0, 0.0, 0.0], 
         #          [0.0, 1.0, 0.0],
@@ -143,7 +143,7 @@ class SRNerfModel(MRNerfModel):
 
         # For operations with the horizon
         horizon_half_angle = 1
-        inner_horizon_factor = 2/3
+        inner_horizon_factor = 1/3
         inner_horizon_half_angle = inner_horizon_factor * horizon_half_angle
         self.horizon_sin_half_angle = math.sin(math.radians(horizon_half_angle))
         self.horizon_sin_half_angle_inner = math.sin(math.radians(inner_horizon_half_angle))
@@ -257,6 +257,12 @@ class SRNerfModel(MRNerfModel):
             # print(f"From Max Density: ({torch.min(outputs["max_density"])}, {torch.max(outputs["max_density"])})")
             # print(f"From Sum Density: ({torch.min(outputs["sum_density"])}, {torch.max(outputs["sum_density"])})")
 
+        # For direction debugging:
+        with torch.no_grad():
+            # The directions can be between -1 and 1. We want to convert this to 
+            # 0 to 1. Hence, +1 to get 0 to 2 and /2 to get 0 to 1
+            outputs["directions"] = (ray_bundle.directions + 1) / 2
+
         #############
         # Minimal Regional NeRF Part (Manually inherited)
 
@@ -272,7 +278,7 @@ class SRNerfModel(MRNerfModel):
             cylinder_radius = 0.05
             lla_mask = (torch.norm(xy - nerf_from_enu_coords, dim=-1) < cylinder_radius).unsqueeze(-1)
             
-            outputs["enu_vis_masked"] = 0.5*torch.sum(weights * lla_mask, dim=-2) + 0.5*rgb
+            outputs["enu_vis"] = 0.5*torch.sum(weights * lla_mask, dim=-2) + 0.5*rgb
 
         #############
         # Horizon
@@ -310,10 +316,6 @@ class SRNerfModel(MRNerfModel):
 
         if self.output_satellites:
             with torch.no_grad():
-                # The directions can be between -1 and 1. We want to convert this to 
-                # 0 to 1. Hence, +1 to get 0 to 2 and /2 to get 0 to 1
-                outputs["directions"] = (ray_bundle.directions + 1) / 2
-
                 # We expand the axes to match [# rays, # sats, 3D]
                 # So, the rays will be        [# rays,      1,  3]
                 # and the satellites will be  [     1, # sats,  3]
@@ -347,8 +349,14 @@ class SRNerfModel(MRNerfModel):
                 for output_key, output_value in outputs.items():
                     # 1.0 for edge, 0.0 for base
                     if "mask" not in output_key:
-                        outputs[output_key][sat_bool_mask_edge] =  torch.inf
-                        outputs[output_key][sat_bool_mask]      = -torch.inf
+                        if output_value.shape[-1] == 3:
+                            # print(f"Applying both edge and disk to {output_key}")
+                            outputs[output_key][sat_bool_mask_edge] =  torch.inf
+                            outputs[output_key][sat_bool_mask]      = -torch.inf
+                        else:
+                            # print(f"Applying only disk to {output_key}")
+                            outputs[output_key][sat_bool_mask_edge] =  torch.inf
+                            outputs[output_key][sat_bool_mask]      = -torch.inf
 
                 outputs["satellite_mask"] = sat_bool_mask.to(accumulation.dtype).unsqueeze(-1)
         

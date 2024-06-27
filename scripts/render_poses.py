@@ -224,7 +224,8 @@ class RenderCameraPose(BaseRender):
     output_format: Literal["images", "video"] = "images"
     """How to save output data."""
 
-    image_format: Literal["jpeg", "png"] = "jpeg"
+    image_format: Literal["jpeg", "png"] = "png"
+    """File type of the output images"""
 
     def main(self) -> None:
         """Main function."""

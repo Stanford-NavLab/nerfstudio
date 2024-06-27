@@ -32,6 +32,11 @@ Colormaps = Literal["default", "viridis", "turbo", "magma", "inferno", "cividis"
                     "gist_ncar-ends", "prism-ends",
                     "pca"]
 
+NEG_INF_COLOR = 0.0
+POS_INF_COLOR = 1.0
+NEG_END_COLOR = 0.1
+POS_END_COLOR = 0.4
+
 
 @dataclass(frozen=True)
 class ColormapOptions:
@@ -75,7 +80,13 @@ def apply_colormap(
     # rendering depth outputs
     if image.shape[-1] == 1 and torch.is_floating_point(image):
         output = image
+
+        # [NAV Lab] allow +- infinity to include plot markings
+        neg_inf_mask = torch.squeeze(output == -torch.inf)
+        pos_inf_mask = torch.squeeze(output ==  torch.inf)
+
         if colormap_options.normalize:
+            # print("Normalizing colormap")
             # [NAV Lab] allow +- infinity
             finite_output_mask = torch.isfinite(output)
             finite_min = torch.min(output[finite_output_mask])
@@ -89,10 +100,20 @@ def apply_colormap(
         output = (
             output * (colormap_options.colormap_max - colormap_options.colormap_min) + colormap_options.colormap_min
         )
+        # print("Applying colormap: ", colormap_options)
+        # print(f"  Min = {torch.min(output)}, Max = {torch.max(output)}")
+
         output = torch.clip(output, 0, 1)
         if colormap_options.invert:
             output = 1 - output
-        return apply_float_colormap(output, colormap=colormap_options.colormap)
+
+        colored_image = apply_float_colormap(output, colormap=colormap_options.colormap)
+
+        # [NAV Lab] Add +- infinity markings
+        colored_image[neg_inf_mask] = NEG_INF_COLOR
+        colored_image[pos_inf_mask] = POS_INF_COLOR
+
+        return colored_image
 
     # rendering boolean outputs
     if image.dtype == torch.bool:
@@ -146,10 +167,11 @@ def apply_float_colormap(image: Float[Tensor, "*bs 1"], colormap: Colormaps = "v
         # Allow access to other color maps using the normal matplotlib interface
         cmap_colors = torch.tensor(cmap_obj(range(256)))[:, :3]
 
+    # [NAV Lab]
     if "ends" in colormap:
         # We need to remove the ends and set to black
-        cmap_colors[ :1, :] = 0.0
-        cmap_colors[-1:, :] = 0.5
+        cmap_colors[ :1, :] = NEG_END_COLOR
+        cmap_colors[-1:, :] = POS_END_COLOR
     
     return cmap_colors.to(image.device)[image_long[..., 0]]
 
@@ -175,17 +197,37 @@ def apply_depth_colormap(
         Colored depth image with colors in [0, 1]
     """
 
-    near_plane = near_plane or float(torch.min(depth))
-    far_plane = far_plane or float(torch.max(depth))
+    # [NAV Lab] allow +- infinity to include plot markings
+    neg_inf_mask = torch.squeeze(depth == -torch.inf)
+    pos_inf_mask = torch.squeeze(depth ==  torch.inf)
+
+    finite_depth_mask = torch.isfinite(depth)
+    finite_min = torch.min(depth[finite_depth_mask])
+    finite_max = torch.max(depth[finite_depth_mask])
+
+    near_plane = near_plane or float(finite_min)
+    far_plane  = far_plane  or float(finite_max)
 
     depth = (depth - near_plane) / (far_plane - near_plane + 1e-10)
-    depth = torch.clip(depth, 0, 1)
+    depth[finite_depth_mask] = torch.clip(depth[finite_depth_mask], 0, 1)
+
+    # Nerfstudio Code
+    # near_plane = near_plane or float(torch.min(depth))
+    # far_plane = far_plane or float(torch.max(depth))
+
+    # depth = (depth - near_plane) / (far_plane - near_plane + 1e-10)
+    # depth = torch.clip(depth, 0, 1)
     # depth = torch.nan_to_num(depth, nan=0.0) # TODO(ethan): remove this
 
     colored_image = apply_colormap(depth, colormap_options=colormap_options)
 
     if accumulation is not None:
         colored_image = colored_image * accumulation + (1 - accumulation)
+    
+    # [NAV Lab]  Add +- infinity markings
+    # The if statement above changes the markings :(
+    colored_image[neg_inf_mask] = NEG_INF_COLOR
+    colored_image[pos_inf_mask] = POS_INF_COLOR
 
     return colored_image
 
