@@ -63,9 +63,9 @@ class MRNerfModel(NerfactoModel):
         
         # Fields
         self.field = MRNerfField(
-            grid_resolutions=self.config.hashgrid_resolutions,
-            grid_layers=self.config.hashgrid_layers,
-            grid_sizes=self.config.hashgrid_sizes,
+            # grid_resolutions=self.config.hashgrid_resolutions,   # HHHIIIII MIRA!!!!
+            # grid_layers=self.config.hashgrid_layers,
+            # grid_sizes=self.config.hashgrid_sizes,
             aabb=self.scene_box.aabb,
             hidden_dim=self.config.hidden_dim,
             num_levels=self.config.num_levels,

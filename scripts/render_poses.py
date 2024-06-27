@@ -66,6 +66,37 @@ def enu_to_ecef_rotation(lat, lon):
     
     return R
 
+
+def skyplot_short_fov_to_focal_length(fov, image_height):
+    """
+    Takes the "short" FOV (i.e., top center to bottom center) and convert it to the focal length needed
+    for Nerfstudio to actually respect the FOV. By default, Nerfstudio uses the function
+    `three_js_perspective_camera_focal_length(fov, image_height)`.
+
+    The three.js function does the following
+    ```
+    pp_h = image_height / 2.0
+    focal_length = pp_h / np.tan(fov * (np.pi / 180.0) / 2.0)  # PROBLEM: Not true for skyplot fisheye
+    return focal_length
+    ```
+
+    Instead, for skyplot fisheye (at least the type that matches a skyplot), we want:
+    ```
+    f = 2 c / FOV = pp_h / FOV
+    ```
+
+    Important! This is _not_ the max FOV (i.e., diagonal).
+
+    Args:
+        fov: A float of the field of view (deg)
+        image_height: Height of the image (pixels)
+    
+    Returns:
+        Focal length
+    """
+    return image_height / np.deg2rad(fov)
+
+
 def get_path_from_json(pipeline, camera_path: Dict[str, Any]) -> Cameras:
     """Takes a camera path dictionary and returns a trajectory as a Camera instance.
 
@@ -144,6 +175,13 @@ def get_path_from_json(pipeline, camera_path: Dict[str, Any]) -> Cameras:
         ]:
             fxs.append(image_width / 2)
             fys.append(image_height)
+        elif camera_type == CameraType.FISHEYE:
+            # [NAV LAB] Allow 'skyplot fisheye' by overriding the normal fisheye
+            # Future work: Make this a new camera type.
+            fov = camera["fov"]
+            focal_length = skyplot_short_fov_to_focal_length(fov, image_height)
+            fxs.append(focal_length)
+            fys.append(focal_length)
         else:
             # field of view
             fov = camera["fov"]
@@ -185,6 +223,8 @@ class RenderCameraPose(BaseRender):
 
     output_format: Literal["images", "video"] = "images"
     """How to save output data."""
+
+    image_format: Literal["jpeg", "png"] = "jpeg"
 
     def main(self) -> None:
         """Main function."""
@@ -242,6 +282,7 @@ class RenderCameraPose(BaseRender):
             output_filename=self.safe_output_path,
             rendered_output_names=self.rendered_output_names,
             output_format = self.output_format,
+            image_format = self.image_format,
             depth_near_plane = self.depth_near_plane,
             depth_far_plane = self.depth_far_plane,
             colormap_options = self.colormap_options

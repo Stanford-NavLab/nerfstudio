@@ -51,19 +51,41 @@ def get_elevation_eu(lat, lon):
         return height
     
     except json.decoder.JSONDecodeError as e:
-        print(f"Query at lat = {lat}, lon = {lon} did not work. Likely out of bounds of US.")
+        print(f"Query at lat = {lat}, lon = {lon} did not work. Likely out of bounds of EU.")
         raise e
 
+def get_elevation_global(lat, lon):
+    try:
+        url = 'https://api.opentopodata.org/v1/aster30m?'
+        params = {'locations': f"{lat},{lon}"}
+        full_url = url + urllib.parse.urlencode(params)
+        print("Querying...", full_url)
+        response = requests.get(full_url)
+        data = json.loads(response.text)
+        print("...Done")
+        if 'results' not in data.keys():
+            print(data['message'])
+            raise ValueError
+        height = data['results'][0]['elevation']
+        print(f"Height set to {height}")
+        return height
+    
+    except json.decoder.JSONDecodeError as e:
+        print(f"Query at lat = {lat}, lon = {lon} did not work. Likely outside of +/- 83 degrees latitude.")
+        raise e
 
 def get_elevation(lat, lon):
     # Separate US from Europe
-    lon_sep = -27
+    lon_sep_us_eu = -27
+    # Separate EU from Hong Kong
+    lon_sep_eu_hk = 70
 
-    if lon < lon_sep:
+    if lon < lon_sep_us_eu:
         return get_elevation_usgs(lat, lon)
-    else:
+    elif lon < lon_sep_eu_hk:
         return get_elevation_eu(lat, lon)
-
+    else:
+        return get_elevation_global(lat, lon)
 
 def geodetic_to_enu(lat_q, lon_q, h_q, lat_c, lon_c, h_c):
     """

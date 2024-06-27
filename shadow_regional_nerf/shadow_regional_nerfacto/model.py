@@ -96,20 +96,42 @@ class SRNerfModel(MRNerfModel):
         self.satellite_disk_edge = 2e-5
         # Not sure if we should set a device at this point
         sqrt_3 = math.sqrt(3)
+
+        ######################################
+        # For testing purposes only
+        ######################################
+        # self.satellite_directions = torch.tensor(
+        #         [[1.0, 0.0, 0.0], 
+        #          [0.0, 1.0, 0.0],
+        #          [0.11043, 0.99388, 0.0],
+        #          [0.936329, 0.0, -0.351123],
+        #          [0.0, 0.0, -1.0],
+        #          [ 1/sqrt_3,  1/sqrt_3, -1/sqrt_3],
+        #          [-1/sqrt_3,  1/sqrt_3, -1/sqrt_3],
+        #          [ 1/sqrt_3, -1/sqrt_3, -1/sqrt_3],
+        #          [-1/sqrt_3, -1/sqrt_3, -1/sqrt_3],
+        #          [ 1/sqrt_3,  1/sqrt_3,  1/sqrt_3],
+        #          [-1/sqrt_3,  1/sqrt_3,  1/sqrt_3],
+        #          [ 1/sqrt_3, -1/sqrt_3,  1/sqrt_3],
+        #          [-1/sqrt_3, -1/sqrt_3,  1/sqrt_3]])
+        #
+        # DATA FOR BERLIN 1 CENTER!
+        # WILL MOVE SETTING TO PIPELINE!!
         self.satellite_directions = torch.tensor(
-                [[1.0, 0.0, 0.0], 
-                 [0.0, 1.0, 0.0],
-                 [0.11043, 0.99388, 0.0],
-                 [0.936329, 0.0, -0.351123],
-                 [0.0, 0.0, -1.0],
-                 [ 1/sqrt_3,  1/sqrt_3, -1/sqrt_3],
-                 [-1/sqrt_3,  1/sqrt_3, -1/sqrt_3],
-                 [ 1/sqrt_3, -1/sqrt_3, -1/sqrt_3],
-                 [-1/sqrt_3, -1/sqrt_3, -1/sqrt_3],
-                 [ 1/sqrt_3,  1/sqrt_3,  1/sqrt_3],
-                 [-1/sqrt_3,  1/sqrt_3,  1/sqrt_3],
-                 [ 1/sqrt_3, -1/sqrt_3,  1/sqrt_3],
-                 [-1/sqrt_3, -1/sqrt_3,  1/sqrt_3]])
+           [[-6.82395927e-04,  8.59793005e-02,  9.96296690e-01],
+            [ 3.52654100e-01, -3.55976992e-01,  8.65399022e-01],
+            [ 6.68119077e-01,  5.68803053e-01,  4.79666536e-01],
+            [-7.70372852e-01,  2.59597404e-01,  5.82352863e-01],
+            [-9.37999502e-01,  1.76337054e-01,  2.98432869e-01],
+            [ 2.03725551e-01,  1.25803163e-01,  9.70911666e-01],
+            [-3.50202213e-02, -9.41419647e-01,  3.35414120e-01],
+            [ 5.06430401e-01,  5.81563778e-01,  6.36641046e-01],
+            [-7.18379069e-01,  4.29425366e-01,  5.47289109e-01],
+            [ 8.38455667e-01, -2.88599108e-01,  4.62279838e-01],
+            [ 3.62825361e-01, -5.51396912e-01,  7.51211823e-01],
+            [ 7.80072757e-01, -4.84298367e-01,  3.96158536e-01],
+            [-6.45188601e-01, -1.63485530e-02,  7.63848411e-01]]
+        )
 
         # For plotting the satellites
         self.output_satellites = True
@@ -266,11 +288,11 @@ class SRNerfModel(MRNerfModel):
                     ray_bundle.directions[:, 2]
                 ) < self.horizon_sin_half_angle
 
-                print("Horizon mask shape: ", horizon_mask.shape)
-                print("Inner condition:  ", self.horizon_sin_half_angle_inner)
-                print("Outer condition:  ", self.horizon_sin_half_angle)
-                print("Horizon num True:   ", horizon_mask.sum())
-                print("Edge    num True:   ", horizon_mask_edge.sum())
+                # print("Horizon mask shape: ", horizon_mask.shape)
+                # print("Inner condition:  ", self.horizon_sin_half_angle_inner)
+                # print("Outer condition:  ", self.horizon_sin_half_angle)
+                # print("Horizon num True:   ", horizon_mask.sum())
+                # print("Edge    num True:   ", horizon_mask_edge.sum())
                 # print(horizon_mask)
 
                 for output_key, output_value in outputs.items():
