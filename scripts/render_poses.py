@@ -61,11 +61,34 @@ def enu_to_ecef_rotation(lat, lon):
     # ENU to ECEF rotation matrix
     R = torch.tensor([
         [-slon, -slat*clon, clat*clon],
-        [clon, -slat*slon, clat*slon],
-        [0, clat, slat]
+        [ clon, -slat*slon, clat*slon],
+        [    0,       clat,      slat]
     ])
     
     return R
+
+
+def generate_safe_path(output_path):
+    """
+    Generate a save path that will not conflict with multiple runs
+    """
+    if output_path is not None:
+        curr_date_time = datetime.now()
+        curr_date_time_str = curr_date_time.strftime('%Y-%m-%d-%H-%M-%S')
+
+        # To make it more human readable,
+        adj_list = ["happy", "significant", "relativistic", "cheerful",
+                    "continuous", "certain", "thoughtful", "powerful"]
+        color_list = ["red", "orange", "yellow", "green",
+                        "blue", "indigo", "violet", "pink"]
+        animal_list = ["panda", "bison", "cheetah", "toucan",
+                        "monkey", "antelope", "tiger", "giraffe"]
+        suffix = random.choice(adj_list) + "_" + random.choice(color_list) + "_" + \
+                    random.choice(animal_list)
+        save_folder_out = curr_date_time_str + "_" + suffix + "/"
+        return Path(output_path, save_folder_out)
+    
+    return output_path
 
 
 def skyplot_short_fov_to_focal_length(fov, image_height):
@@ -225,7 +248,7 @@ class RenderCameraPose(BaseRender):
     output_format: Literal["images", "video"] = "images"
     """How to save output data."""
 
-    image_format: Literal["jpeg", "png"] = "png"
+    image_format: Literal["jpeg", "png"] = "jpeg"
     """File type of the output images"""
 
     def main(self) -> None:
@@ -249,24 +272,7 @@ class RenderCameraPose(BaseRender):
         crop_data = get_crop_from_json(camera_path)
         print("[Render Poses] ...Done")
 
-        # Generate a save path that will not conflict with multiple runs
-        if self.output_path is not None:
-            curr_date_time = datetime.now()
-            curr_date_time_str = curr_date_time.strftime('%Y-%m-%d-%H-%M-%S')
-
-            # To make it more human readable,
-            adj_list = ["happy", "significant", "relativistic", "cheerful",
-                        "continuous", "certain", "thoughtful", "powerful"]
-            color_list = ["red", "orange", "yellow", "green",
-                          "blue", "indigo", "violet", "pink"]
-            animal_list = ["panda", "bison", "cheetah", "toucan",
-                           "monkey", "antelope", "tiger", "giraffe"]
-            suffix = random.choice(adj_list) + "_" + random.choice(color_list) + "_" + \
-                        random.choice(animal_list)
-            save_folder_out = curr_date_time_str + "_" + suffix + "/"
-            self.safe_output_path = Path(self.output_path, save_folder_out)
-        else:
-            self.safe_output_path = self.output_path
+        self.safe_output_path = generate_safe_path(self.output_path)
 
         print(f"[Render Poses] Will save to {self.safe_output_path}")
         print(f"Original path was {self.output_path}")
