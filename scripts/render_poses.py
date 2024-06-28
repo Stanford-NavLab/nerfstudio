@@ -1,5 +1,6 @@
 from nerfstudio.cameras.cameras import Cameras, CameraType, RayBundle
-from nerfstudio.scripts.render import _render_trajectory_video, BaseRender
+from nerfstudio.scripts.render import _render_trajectory_video, BaseRender, \
+                                        get_crop_from_json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -244,6 +245,10 @@ class RenderCameraPose(BaseRender):
         cameras = get_path_from_json(pipeline, camera_path)
         print("[Render Poses] ...Done")
 
+        print("[Render Poses] Computing Crop...")
+        crop_data = get_crop_from_json(camera_path)
+        print("[Render Poses] ...Done")
+
         # Generate a save path that will not conflict with multiple runs
         if self.output_path is not None:
             curr_date_time = datetime.now()
@@ -282,6 +287,7 @@ class RenderCameraPose(BaseRender):
             cameras=cameras, 
             output_filename=self.safe_output_path,
             rendered_output_names=self.rendered_output_names,
+            crop_data=crop_data,
             output_format = self.output_format,
             image_format = self.image_format,
             depth_near_plane = self.depth_near_plane,
