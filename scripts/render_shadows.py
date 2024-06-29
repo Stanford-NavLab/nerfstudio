@@ -10,6 +10,8 @@ from typing import List, Literal, Optional, Union
 from contextlib import ExitStack
 
 import torch
+from torch import Tensor
+from jaxtyping import Float
 
 import mediapy as media
 import tyro
@@ -153,10 +155,81 @@ def make_default_crop():
             obb=OrientedBox.from_params(center, rot, scale),
         )
 
+@dataclass
+class SatAndGrid:
+    """
+    Convenience Data Class to store satellite information and grid points.
+    """
+
+    satellite_directions: Float[Tensor, "*num_satellites 3"]
+    grid_points: Float[Tensor, "*num_points 3"]
+    pixel_area: Float[Tensor, "1"]
+
+    def __init__(self, satellite_directions, grid_bounds, grid_size, alt, pixel_area):
+        """
+        Initialize the Satellites and Grid together from user parameters.
+        """
+
+        # Satellites
+        self.satellite_directions = torch.tensor(satellite_directions)
+
+        # Grid
+        self.grid_x_len, self.grid_y_len = grid_size
+        self.grid_x_min, self.grid_x_max, self.grid_y_min, self.grid_y_max = grid_bounds
+        self.nerf_alt = alt
+
+        self.full_grid = self._init_make_grid()
+
+        # Auxiliary paramaters
+        self.pixel_area = torch.tensor([pixel_area])
+
+    def check_bounds(self):
+        """
+        Check that the bounds make sense
+        """
+        assert self.grid_x_min < self.grid_x_max
+        assert self.grid_y_min < self.grid_y_max
+
+    def _init_make_grid(self):
+        """
+        Use meshgrid to make an appropriate grid.
+        """
+        # Order in linspace is super important!
+        # For the camera, xy is the _top left_ corner
+        # So   x goes min -> max, 
+        # but, y goes max -> min
+        # It is also important we use "xy" indexing to match ENU
+        grid_x, grid_y = torch.meshgrid(
+            torch.linspace(self.grid_x_min, self.grid_x_max, steps=self.grid_x_len),
+            torch.linspace(self.grid_y_max, self.grid_y_min, steps=self.grid_y_len),
+            indexing='xy'
+        )
+        grid_z = torch.tensor([self.nerf_alt]).reshape(1, 1).repeat(
+            *grid_x.shape
+        )
+        return torch.stack(
+            (grid_x, grid_y, grid_z), dim=-1
+        ) 
+
+
+    def get_shadow_cameras(self) -> List:
+        """
+        Package all the satellites and grids into camera objects.
+
+        (One "camera" per satellite)
+        """
+        return [
+            SatelliteDirectionCamera(
+                self.full_grid, direction, self.pixel_area
+            ) for direction in self.satellite_directions
+        ]
+
 
 @dataclass
 class ShadowRenderer(RenderCameraPose):
     """Render a GNSS satellite shadow"""
+    satellite_grids_filename: Path = None
+    """Filename to the satellite directions and grid points to render"""
 
     image_format: Literal["jpeg", "png"] = "png"
     """File type of the output images"""
@@ -172,6 +245,11 @@ class ShadowRenderer(RenderCameraPose):
             test_mode="inference",
         )
         print("[Shadow Renderer] ...Setting up pipeline done")
+
+        print("[Shadow Renderer] Computing Satellites & Grid...")
+        # sat_and_grid = get_sat_and_grid_from_json(satellite_grids_filename)
+        # shadow_cams = sat_and_grid.get_shadow_cameras()
+        print("[Shadow Renderer] ... Done")
 
         self.safe_output_path = generate_safe_path(self.output_path)
 
@@ -235,11 +313,16 @@ class ShadowRenderer(RenderCameraPose):
         # )
         # print(f"Shadow Cam: {vars(shadow_cam)}")
 
-        shadow_cams = [
-            SatelliteDirectionCamera(
-                origins, direction, pixel_area
-            ) for direction in directions
-        ]
+        # shadow_cams = [
+        #     SatelliteDirectionCamera(
+        #         origins, direction, pixel_area
+        #     ) for direction in directions
+        # ]
+
+        grid_bounds = [-1, 1, -1, 1]
+        grid_dims = [1007, 1003]
+        sat_and_grid = SatAndGrid(directions, grid_bounds, grid_dims, -0.54, 0.001)
+        shadow_cams = sat_and_grid.get_shadow_cameras()
 
         _render_shadow_images(
             pipeline=pipeline,
