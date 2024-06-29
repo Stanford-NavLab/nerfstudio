@@ -21,6 +21,8 @@ from rich.progress import (BarColumn, Progress, TaskProgressColumn, TextColumn,
                            TimeElapsedColumn, TimeRemainingColumn)
 from rich.table import Table
 
+from nerfstudio.data.scene_box import OrientedBox
+from nerfstudio.model_components import renderers
 from nerfstudio.pipelines.base_pipeline import Pipeline
 from nerfstudio.utils import colormaps
 from nerfstudio.utils.eval_utils import eval_setup
@@ -70,6 +72,12 @@ def _render_shadow_images(
             num_sats = len(satellite_shadow_cameras)
 
             for camera_idx in progress.track(range(num_sats), description=""):
+                # Make sure that the camera is on device
+                camera = satellite_shadow_cameras[camera_idx]
+                camera.send_to_device(pipeline.device)
+                # print("Camera on device: ", camera.device)
+                # print("Pipeline on device: ", pipeline.device)
+
                 obb_box = None
                 if crop_data is not None:
                     obb_box = crop_data.obb
@@ -82,12 +90,12 @@ def _render_shadow_images(
                         crop_data.background_color.to(pipeline.device)
                     ), torch.no_grad():
                         outputs = pipeline.model.get_outputs_for_camera(
-                            satellite_shadow_cameras[camera_idx : camera_idx + 1], obb_box=obb_box
+                            camera, obb_box=obb_box
                         )
                 else:
                     with torch.no_grad():
                         outputs = pipeline.model.get_outputs_for_camera(
-                            satellite_shadow_cameras[camera_idx], obb_box=obb_box
+                            camera, obb_box=obb_box
                         )
 
                 render_image = []
@@ -130,6 +138,20 @@ def _render_shadow_images(
     CONSOLE.print(Panel(table, title="[bold][green]:tada: Render Complete :tada:[/bold]", expand=False))
 
 
+def make_default_crop():
+    """
+    Default crop
+    """
+    center = ( 0.0,  0.0, -0.5)
+    rot    = ( 0.0,  0.0,  0.0)
+    scale  = ( 4.0,  4.0,  1.0) 
+    # Scale is the width, height, depth of the box.
+    # So, if you want -3 to 3, you need to set 6
+
+    return CropData(
+            background_color=torch.Tensor([1, 0, 0]),
+            obb=OrientedBox.from_params(center, rot, scale),
+        )
 
 
 @dataclass
@@ -149,40 +171,44 @@ class ShadowRenderer(RenderCameraPose):
             eval_num_rays_per_chunk=self.eval_num_rays_per_chunk,
             test_mode="inference",
         )
-        print("[Render Poses] ...Setting up pipeline done")
+        print("[Shadow Renderer] ...Setting up pipeline done")
 
         self.safe_output_path = generate_safe_path(self.output_path)
 
-        print(f"[Render Poses] Will save to {self.safe_output_path}")
+        print(f"[Shadow Renderer] Will save to {self.safe_output_path}")
         print(f"Original path was {self.output_path}")
 
-        # TODO!
-        crop_data = None
+        # Get from file in the future
+        crop_data = make_default_crop()
+        # crop_data = None
 
-        print("[Render Poses] Printing self")
+        print("[Shadow Renderer] Printing self")
         print(self.nice_self_json())
 
-        print("[Render Poses] Saving params")
+        print("[Shadow Renderer] Saving params")
         self.save_params_to_json()
         # Also copy the current JSON
         dst = Path(self.safe_output_path, "camera_path.json")
 
-        origins = torch.tensor(
-            [[1.0, 0.1, 0.3],
-             [1.0, 0.2, 0.3],
-             [1.0, 0.3, 0.3],
-             [1.0, 0.4, 0.3],
-             [1.0, 0.5, 0.3],
-             [1.0, 0.6, 0.3],
-             [1.0, 0.7, 0.3],
-             [1.0, 0.8, 0.3],
-             [1.0, 0.9, 0.3],
-             [1.0, 1.0, 0.3],]
+        grid_x_len = 1007   # Image Width
+        grid_y_len = 507    # Image Height
+        nerf_alt   = -0.54
+        grid_x, grid_y = torch.meshgrid(
+            torch.linspace(-1, 1, steps=grid_x_len),
+            torch.linspace(1, -1, steps=grid_y_len),
+            indexing='xy'
+        )
+        grid_z = torch.tensor([nerf_alt]).reshape(1, 1).repeat(
+            *grid_x.shape
+        )
+        origins = torch.stack(
+            (grid_x, grid_y, grid_z), dim=-1
         )
         directions = torch.tensor(
-            [-6.82395927e-04,  8.59793005e-02,  9.96296690e-01]
+            # [-6.82395927e-04,  8.59793005e-02,  9.96296690e-01]
+            [0.000001, 0.0000001, 0.9999999999]
         )
-        pixel_area = torch.tensor([0.01])
+        pixel_area = torch.tensor([0.001])
 
         print("Origins has shape: ", origins.shape)
         print("Directions has shape: ", directions.shape)
@@ -191,7 +217,9 @@ class ShadowRenderer(RenderCameraPose):
         shadow_cam = SatelliteDirectionCamera(
             origins, directions, pixel_area
         )
-        print(f"Shadow Cam: {vars(shadow_cam)}")
+        # print(f"Shadow Cam: {vars(shadow_cam)}")
+
+
 
         _render_shadow_images(
             pipeline=pipeline,

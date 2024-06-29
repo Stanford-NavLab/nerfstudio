@@ -17,6 +17,7 @@ import torch
 from jaxtyping import Float, Shaped
 from torch import Tensor
 
+from nerfstudio.utils.math import intersect_aabb, intersect_obb
 from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.data.scene_box import OrientedBox, SceneBox
 from nerfstudio.utils.tensor_dataclass import TensorDataclass
@@ -41,48 +42,88 @@ class SatelliteDirectionCamera(TensorDataclass):
 
         # Check the shapes
         assert directions.shape == (3,)
-        assert origins.shape[1] == 3
+        assert len(origins.shape) == 3
+        assert origins.shape[2] == 3
         assert pixel_area.shape == (1,)
 
         self.origins = origins
         self.directions = directions
         self.pixel_area = pixel_area
-        
-        self.num_points = self.origins.shape[0]
 
-        self.origins_expanded, self.directions_expanded, \
-            self.pixel_area_expanded = self._init_get_expand_rays()
+        # 1 AXIS VERSION
+        # self.origins_expanded, self.directions_expanded, \
+        #     self.pixel_area_expanded = self._init_get_expand_rays()
 
+        # # Check the shapes
+        # assert self.directions_expanded.shape == self.origins_expanded.shape, \
+        #     f"Directions has shape {self.directions_expanded.shape}," + \
+        #     f"but Origins has shape {self.origins_expanded.shape}"
+        # assert self.pixel_area_expanded.shape[0] == self.origins_expanded.shape[0], \
+        #     f"Pixel areas has shape {self.pixel_area_expanded.shape}," + \
+        #     f"but Origins has shape {self.origins_expanded.shape}"
+
+        # 2 AXIS VERSION
+        self.height, self.width = self.origins.shape[:2]
+
+        self.directions_expanded, self.pixel_area_expanded = self._init_get_expand_rays()
         # Check the shapes
-        assert self.directions_expanded.shape == self.origins_expanded.shape, \
+        assert self.directions_expanded.shape == self.origins.shape, \
             f"Directions has shape {self.directions_expanded.shape}," + \
-            f"but Origins has shape {self.origins_expanded.shape}"
-        assert self.pixel_area_expanded.shape[0] == self.origins_expanded.shape[0], \
+            f"but Origins has shape {self.origins.shape}"
+        assert self.pixel_area_expanded.shape[0] == self.origins.shape[0], \
             f"Pixel areas has shape {self.pixel_area_expanded.shape}," + \
-            f"but Origins has shape {self.origins_expanded.shape}"
+            f"but Origins has shape {self.origins.shape}"
+
 
     @property
     def device(self) -> TORCH_DEVICE:
         """Returns the device that the camera is on."""
         return self.origins.device
 
+    @property
+    def image_height(self) -> Shaped[Tensor, "*num_cameras 1"]:
+        """Returns the height of the images."""
+        return self.height
+
+    @property
+    def image_width(self) -> Shaped[Tensor, "*num_cameras 1"]:
+        """Returns the height of the images."""
+        return self.width
+
     def _init_get_expand_rays(self):
         """
         Convert origins of shape "*num_points 3" and directions of shape
         "*num_satellites 3" into
-        origins_expanded    = ["num_points" 1 3]
-        directions_expanded = ["num_points" 1 3]
-        pixel_area_expanded = ["num_points" 1 1]
+        origins_expanded    = [height width 3]
+        directions_expanded = [height width 3]
+        pixel_area_expanded = [height width 1]
         """
-        origins_expanded = self.origins.reshape(-1, 1, 3)
+        # 1 AXIS VERSION
+        # origins_expanded = self.origins.reshape(-1, 1, 3)
+        # directions_expanded = self.directions.reshape(1, 1, 3).repeat(
+        #     self.num_points, 1, 1
+        # )
+        # pixel_area_expanded = self.pixel_area.reshape(1, 1, 1).repeat(
+        #     self.num_points, 1, 1
+        # )
+
+        # return origins_expanded, directions_expanded, pixel_area_expanded
+
+        # 2 AXIS VERSION
         directions_expanded = self.directions.reshape(1, 1, 3).repeat(
-            self.num_points, 1, 1
+            self.height, self.width, 1
         )
         pixel_area_expanded = self.pixel_area.reshape(1, 1, 1).repeat(
-            self.num_points, 1, 1
+            self.height, self.width, 1
         )
 
-        return origins_expanded, directions_expanded, pixel_area_expanded
+        return directions_expanded, pixel_area_expanded
+
+    def send_to_device(self, device):
+        
+        self.origins = self.origins.to(device)
+        self.directions_expanded = self.directions_expanded.to(self.device)
+        self.pixel_area = self.pixel_area_expanded.to(self.device)
 
     def generate_rays(
         self,
@@ -98,7 +139,9 @@ class SatelliteDirectionCamera(TensorDataclass):
         `nerfstudio > cameras > cameras.py > generate_rays(...)
         """
         # Make sure we're on the right devices
-        origins    = self.origins_expanded.to(self.device)
+        # origins    = self.origins_expanded.to(self.device)
+        # print("Generating rays on device: ", self.device)
+        origins    = self.origins.to(self.device)
         directions = self.directions_expanded.to(self.device)
         pixel_area = self.pixel_area_expanded.to(self.device)
 
@@ -127,9 +170,9 @@ class SatelliteDirectionCamera(TensorDataclass):
                 if aabb_box is not None:
                     tensor_aabb = Parameter(aabb_box.aabb.flatten(), requires_grad=False)
                     tensor_aabb = tensor_aabb.to(rays_o.device)
-                    t_min, t_max = nerfstudio.utils.math.intersect_aabb(rays_o, rays_d, tensor_aabb)
+                    t_min, t_max = intersect_aabb(rays_o, rays_d, tensor_aabb)
                 elif obb_box is not None:
-                    t_min, t_max = nerfstudio.utils.math.intersect_obb(rays_o, rays_d, obb_box)
+                    t_min, t_max = intersect_obb(rays_o, rays_d, obb_box)
                 else:
                     assert False
 
