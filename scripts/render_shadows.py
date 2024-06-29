@@ -149,7 +149,7 @@ def make_default_crop():
     # So, if you want -3 to 3, you need to set 6
 
     return CropData(
-            background_color=torch.Tensor([1, 0, 0]),
+            background_color=torch.Tensor([1, 1, 1]),
             obb=OrientedBox.from_params(center, rot, scale),
         )
 
@@ -158,7 +158,7 @@ def make_default_crop():
 class ShadowRenderer(RenderCameraPose):
     """Render a GNSS satellite shadow"""
 
-    image_format: Literal["jpeg", "png"] = "jpeg"
+    image_format: Literal["jpeg", "png"] = "png"
     """File type of the output images"""
 
     def main(self) -> None:
@@ -191,11 +191,11 @@ class ShadowRenderer(RenderCameraPose):
         dst = Path(self.safe_output_path, "camera_path.json")
 
         grid_x_len = 1007   # Image Width
-        grid_y_len = 507    # Image Height
+        grid_y_len = 1003    # Image Height
         nerf_alt   = -0.54
         grid_x, grid_y = torch.meshgrid(
-            torch.linspace(-1, 1, steps=grid_x_len),
-            torch.linspace(1, -1, steps=grid_y_len),
+            torch.linspace(-1,  1, steps=grid_x_len),
+            torch.linspace( 1, -1, steps=grid_y_len),
             indexing='xy'
         )
         grid_z = torch.tensor([nerf_alt]).reshape(1, 1).repeat(
@@ -204,9 +204,25 @@ class ShadowRenderer(RenderCameraPose):
         origins = torch.stack(
             (grid_x, grid_y, grid_z), dim=-1
         )
+        # directions = torch.tensor(
+        #     # [-6.82395927e-04,  8.59793005e-02,  9.96296690e-01]
+        #     [0.000001, 0.0000001, 0.9999999999]
+        # ) 
+
         directions = torch.tensor(
-            # [-6.82395927e-04,  8.59793005e-02,  9.96296690e-01]
-            [0.000001, 0.0000001, 0.9999999999]
+           [[-6.82395927e-04,  8.59793005e-02,  9.96296690e-01],
+            [ 3.52654100e-01, -3.55976992e-01,  8.65399022e-01],
+            [ 6.68119077e-01,  5.68803053e-01,  4.79666536e-01],
+            [-7.70372852e-01,  2.59597404e-01,  5.82352863e-01],
+            [-9.37999502e-01,  1.76337054e-01,  2.98432869e-01],
+            [ 2.03725551e-01,  1.25803163e-01,  9.70911666e-01],
+            [-3.50202213e-02, -9.41419647e-01,  3.35414120e-01],
+            [ 5.06430401e-01,  5.81563778e-01,  6.36641046e-01],
+            [-7.18379069e-01,  4.29425366e-01,  5.47289109e-01],
+            [ 8.38455667e-01, -2.88599108e-01,  4.62279838e-01],
+            [ 3.62825361e-01, -5.51396912e-01,  7.51211823e-01],
+            [ 7.80072757e-01, -4.84298367e-01,  3.96158536e-01],
+            [-6.45188601e-01, -1.63485530e-02,  7.63848411e-01]]
         )
         pixel_area = torch.tensor([0.001])
 
@@ -214,16 +230,20 @@ class ShadowRenderer(RenderCameraPose):
         print("Directions has shape: ", directions.shape)
         print("Pixel Area has shape: ", pixel_area.shape)
 
-        shadow_cam = SatelliteDirectionCamera(
-            origins, directions, pixel_area
-        )
+        # shadow_cam = SatelliteDirectionCamera(
+        #     origins, directions, pixel_area
+        # )
         # print(f"Shadow Cam: {vars(shadow_cam)}")
 
-
+        shadow_cams = [
+            SatelliteDirectionCamera(
+                origins, direction, pixel_area
+            ) for direction in directions
+        ]
 
         _render_shadow_images(
             pipeline=pipeline,
-            satellite_shadow_cameras=[shadow_cam],
+            satellite_shadow_cameras=shadow_cams,
             output_filename=self.safe_output_path,
             rendered_output_names=self.rendered_output_names,
             crop_data=crop_data,
@@ -232,10 +252,6 @@ class ShadowRenderer(RenderCameraPose):
             depth_far_plane = self.depth_far_plane,
             colormap_options = self.colormap_options
         )
-
-
-
-
 
 
 
