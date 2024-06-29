@@ -134,7 +134,7 @@ class SRNerfModel(MRNerfModel):
         )
 
         # For plotting the satellites
-        self.output_satellites = True
+        self.output_satellites = False # True
         self.use_satellites_reader = ViewerCheckbox("Show Satellites", 
                                                     self.output_satellites, 
                                                     cb_hook=self.satellites_cb, 
@@ -149,7 +149,7 @@ class SRNerfModel(MRNerfModel):
         self.horizon_sin_half_angle_inner = math.sin(math.radians(inner_horizon_half_angle))
 
         # For plotting the horizon
-        self.output_horizon = True
+        self.output_horizon = False # True
         self.use_horizon_reader = ViewerCheckbox("Show Horizon", 
                                                     self.output_horizon, 
                                                     cb_hook=self.horizon_cb, 

@@ -8,6 +8,7 @@ import sys
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Union
 from contextlib import ExitStack
+import json
 
 import torch
 from torch import Tensor
@@ -29,7 +30,7 @@ from nerfstudio.pipelines.base_pipeline import Pipeline
 from nerfstudio.utils import colormaps
 from nerfstudio.utils.eval_utils import eval_setup
 from nerfstudio.utils.rich_utils import CONSOLE, ItersPerSecColumn
-from nerfstudio.scripts.render import CropData
+from nerfstudio.scripts.render import CropData, get_crop_from_json
 
 from render_poses import generate_safe_path, RenderCameraPose
 from shadow_regional_nerfacto.cameras.satellite_shadow_camera import SatelliteDirectionCamera
@@ -140,21 +141,6 @@ def _render_shadow_images(
     CONSOLE.print(Panel(table, title="[bold][green]:tada: Render Complete :tada:[/bold]", expand=False))
 
 
-def make_default_crop():
-    """
-    Default crop
-    """
-    center = ( 0.0,  0.0, -0.5)
-    rot    = ( 0.0,  0.0,  0.0)
-    scale  = ( 4.0,  4.0,  1.0) 
-    # Scale is the width, height, depth of the box.
-    # So, if you want -3 to 3, you need to set 6
-
-    return CropData(
-            background_color=torch.Tensor([1, 1, 1]),
-            obb=OrientedBox.from_params(center, rot, scale),
-        )
-
 @dataclass
 class SatAndGrid:
     """
@@ -240,29 +226,29 @@ class SatAndGrid:
         ]
 
 
-def get_sat_and_grid_from_json(sat_and_grid_params: Dict[str, Any]) -> SatAndGrid:
+def get_sat_and_grid_from_json(shadow_cam_params: Dict[str, Any]) -> SatAndGrid:
     """
     Takes a dictionary (from JSON) of satellite and grid parameters
     """
 
     # Satellites
-    satellite_enu_directions = sat_and_grid_params["satellite_enu_directions"]
+    satellite_enu_directions = shadow_cam_params["satellite_enu_directions"]
 
     # Grid
-    grid_x_num = sat_and_grid_params["grid_num_east"]
-    grid_y_num = sat_and_grid_params["grid_num_north"]
+    grid_x_num = shadow_cam_params["grid"]["grid_num_east"]
+    grid_y_num = shadow_cam_params["grid"]["grid_num_north"]
 
     # IMPORTANT: In the future these will be Lat, Lon not NeRF Coords
     # Hence, we will get a grid_lat_bounds and grid_lon_bounds
     # that we will need to transfer to NeRF coordinates
-    grid_x_bounds = sat_and_grid_params["grid_bounds_east"]
-    grid_y_bounds = sat_and_grid_params["grid_bounds_north"]
+    grid_x_bounds = shadow_cam_params["grid"]["grid_bounds_east"]
+    grid_y_bounds = shadow_cam_params["grid"]["grid_bounds_north"]
 
     # Similarly, this will altitude that we need to convert to NeRF Coords
-    z_plane = sat_and_grid_params["grid_up_plane"]
+    z_plane = shadow_cam_params["grid"]["grid_up_plane"]
 
     # Auxiliary paramaters
-    pixel_area = sat_and_grid_params["grid_area"]
+    pixel_area = shadow_cam_params["grid"]["grid_area"]
 
     return SatAndGrid(
         satellite_directions=satellite_enu_directions,
@@ -277,7 +263,7 @@ def get_sat_and_grid_from_json(sat_and_grid_params: Dict[str, Any]) -> SatAndGri
 @dataclass
 class ShadowRenderer(RenderCameraPose):
     """Render a GNSS satellite shadow"""
-    satellite_grids_filename: Path = None
+    shadow_cam_params_filename: Path = None
     """Filename to the satellite directions and grid points to render"""
 
     image_format: Literal["jpeg", "png"] = "png"
@@ -296,43 +282,22 @@ class ShadowRenderer(RenderCameraPose):
         print("[Shadow Renderer] ...Setting up pipeline done")
 
         print("[Shadow Renderer] Computing Satellites & Grid...")
-        # sat_and_grid = get_sat_and_grid_from_json(satellite_grids_filename)
-        # shadow_cams = sat_and_grid.get_shadow_cameras()
+        with open(self.shadow_cam_params_filename, "r", encoding="utf-8") as f:
+            shadow_cam_params = json.load(f)
 
-        sat_and_grid_params = {
-            "satellite_enu_directions":[[-6.82395927e-04,  8.59793005e-02,  9.96296690e-01],
-                                        [ 3.52654100e-01, -3.55976992e-01,  8.65399022e-01],
-                                        [ 6.68119077e-01,  5.68803053e-01,  4.79666536e-01],
-                                        [-7.70372852e-01,  2.59597404e-01,  5.82352863e-01],
-                                        [-9.37999502e-01,  1.76337054e-01,  2.98432869e-01],
-                                        [ 2.03725551e-01,  1.25803163e-01,  9.70911666e-01],
-                                        [-3.50202213e-02, -9.41419647e-01,  3.35414120e-01],
-                                        [ 5.06430401e-01,  5.81563778e-01,  6.36641046e-01],
-                                        [-7.18379069e-01,  4.29425366e-01,  5.47289109e-01],
-                                        [ 8.38455667e-01, -2.88599108e-01,  4.62279838e-01],
-                                        [ 3.62825361e-01, -5.51396912e-01,  7.51211823e-01],
-                                        [ 7.80072757e-01, -4.84298367e-01,  3.96158536e-01],
-                                        [-6.45188601e-01, -1.63485530e-02,  7.63848411e-01]],
-            "grid_num_east": 1003,
-            "grid_num_north": 1007,
-            "grid_bounds_east": [-1, 1],
-            "grid_bounds_north": [-1, 1],
-            "grid_up_plane": -0.54,
-            "grid_area": 0.001
-        }
-        sat_and_grid = get_sat_and_grid_from_json(sat_and_grid_params)
+        sat_and_grid = get_sat_and_grid_from_json(shadow_cam_params)
         shadow_cams = sat_and_grid.get_shadow_cameras()
 
         print("[Shadow Renderer] ... Done")
+
+        print("[Shadow Renderer] Computing Crop...")
+        crop_data = get_crop_from_json(shadow_cam_params)
+        print("[Shadow Renderer] ...Done")
 
         self.safe_output_path = generate_safe_path(self.output_path)
 
         print(f"[Shadow Renderer] Will save to {self.safe_output_path}")
         print(f"Original path was {self.output_path}")
-
-        # Get from file in the future
-        crop_data = make_default_crop()
-        # crop_data = None
 
         print("[Shadow Renderer] Printing self")
         print(self.nice_self_json())
@@ -340,63 +305,8 @@ class ShadowRenderer(RenderCameraPose):
         print("[Shadow Renderer] Saving params")
         self.save_params_to_json()
         # Also copy the current JSON
-        dst = Path(self.safe_output_path, "camera_path.json")
-
-        # grid_x_len = 1007   # Image Width
-        # grid_y_len = 1003    # Image Height
-        # nerf_alt   = -0.54
-        # grid_x, grid_y = torch.meshgrid(
-        #     torch.linspace(-1,  1, steps=grid_x_len),
-        #     torch.linspace( 1, -1, steps=grid_y_len),
-        #     indexing='xy'
-        # )
-        # grid_z = torch.tensor([nerf_alt]).reshape(1, 1).repeat(
-        #     *grid_x.shape
-        # )
-        # origins = torch.stack(
-        #     (grid_x, grid_y, grid_z), dim=-1
-        # )
-        # # directions = torch.tensor(
-        # #     # [-6.82395927e-04,  8.59793005e-02,  9.96296690e-01]
-        # #     [0.000001, 0.0000001, 0.9999999999]
-        # # ) 
-
-        # directions = torch.tensor(
-        #    [[-6.82395927e-04,  8.59793005e-02,  9.96296690e-01],
-        #     [ 3.52654100e-01, -3.55976992e-01,  8.65399022e-01],
-        #     [ 6.68119077e-01,  5.68803053e-01,  4.79666536e-01],
-        #     [-7.70372852e-01,  2.59597404e-01,  5.82352863e-01],
-        #     [-9.37999502e-01,  1.76337054e-01,  2.98432869e-01],
-        #     [ 2.03725551e-01,  1.25803163e-01,  9.70911666e-01],
-        #     [-3.50202213e-02, -9.41419647e-01,  3.35414120e-01],
-        #     [ 5.06430401e-01,  5.81563778e-01,  6.36641046e-01],
-        #     [-7.18379069e-01,  4.29425366e-01,  5.47289109e-01],
-        #     [ 8.38455667e-01, -2.88599108e-01,  4.62279838e-01],
-        #     [ 3.62825361e-01, -5.51396912e-01,  7.51211823e-01],
-        #     [ 7.80072757e-01, -4.84298367e-01,  3.96158536e-01],
-        #     [-6.45188601e-01, -1.63485530e-02,  7.63848411e-01]]
-        # )
-        # pixel_area = torch.tensor([0.001])
-
-        # print("Origins has shape: ", origins.shape)
-        # print("Directions has shape: ", directions.shape)
-        # print("Pixel Area has shape: ", pixel_area.shape)
-
-        # # shadow_cam = SatelliteDirectionCamera(
-        # #     origins, directions, pixel_area
-        # # )
-        # # print(f"Shadow Cam: {vars(shadow_cam)}")
-
-        # # shadow_cams = [
-        # #     SatelliteDirectionCamera(
-        # #         origins, direction, pixel_area
-        # #     ) for direction in directions
-        # # ]
-
-        # grid_bounds = [-1, 1, -1, 1]
-        # grid_dims = [1007, 1003]
-        # sat_and_grid = SatAndGrid(directions, grid_bounds, grid_dims, -0.54, 0.001)
-        # shadow_cams = sat_and_grid.get_shadow_cameras()
+        dst = Path(self.safe_output_path, "shadow_cam_params.json")
+        shutil.copyfile(self.shadow_cam_params_filename, dst)
 
         _render_shadow_images(
             pipeline=pipeline,
