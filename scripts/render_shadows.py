@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Union
 from contextlib import ExitStack
 import json
+import time
 
 import torch
 from torch import Tensor
@@ -88,6 +89,8 @@ def _render_shadow_images(
                 max_dist, max_idx = -1, -1
                 true_max_dist, true_max_idx = -1, -1
 
+                # We time this since this is the main NeRF part
+                start_nerf_run_timer = time.time()
                 if crop_data is not None:
                     with renderers.background_color_override_context(
                         crop_data.background_color.to(pipeline.device)
@@ -100,7 +103,10 @@ def _render_shadow_images(
                         outputs = pipeline.model.get_outputs_for_camera(
                             camera, obb_box=obb_box
                         )
+                end_nerf_run_timer = time.time()
+                print(f"Elapsed time: {end_nerf_run_timer - start_nerf_run_timer:.4f} seconds")
 
+                all_direct_outputs = []
                 render_image = []
                 for rendered_output_name in rendered_output_names:
                     if rendered_output_name not in outputs:
@@ -111,10 +117,14 @@ def _render_shadow_images(
                         )
                         sys.exit(1)
 
-                    output_image = outputs[rendered_output_name]
+                    direct_output = outputs[rendered_output_name]
+                    # Log the direct outputs to save later
+                    all_direct_outputs.append(direct_output.cpu().numpy())
+
+                    # Colormap it to make an image
                     output_image = (
                             colormaps.apply_colormap(
-                                image=output_image,
+                                image=direct_output,
                                 colormap_options=colormap_options,
                             )
                             .cpu()
@@ -122,14 +132,21 @@ def _render_shadow_images(
                         )
                     render_image.append(output_image)
 
+                # Concatenate into a row
                 render_image = np.concatenate(render_image, axis=1)
+                # Concatennate along a new axis such that each output is a different channel
+                direct_out_stack = np.concatenate(all_direct_outputs, axis=-1)
 
+                # Save the image
                 if image_format == "png":
                     media.write_image(output_image_dir / f"{camera_idx:05d}.png", render_image, fmt="png")
                 if image_format == "jpeg":
                     media.write_image(
                         output_image_dir / f"{camera_idx:05d}.jpg", render_image, fmt="jpeg", quality=jpeg_quality
                     )
+
+                # Save the direct outputs
+                np.save(output_image_dir / f"{camera_idx:05d}.npy", direct_out_stack)
 
     table = Table(
         title=None,
