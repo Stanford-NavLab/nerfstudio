@@ -6,7 +6,7 @@ from pathlib import Path
 import shutil
 import sys
 from dataclasses import dataclass
-from typing import List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 from contextlib import ExitStack
 
 import torch
@@ -162,25 +162,40 @@ class SatAndGrid:
     """
 
     satellite_directions: Float[Tensor, "*num_satellites 3"]
-    grid_points: Float[Tensor, "*num_points 3"]
+    full_grid: Float[Tensor, "*num_points 3"]
     pixel_area: Float[Tensor, "1"]
 
-    def __init__(self, satellite_directions, grid_bounds, grid_size, alt, pixel_area):
+    def __init__(self, satellite_directions, grid_bounds, grid_size, z_plane, pixel_area):
         """
         Initialize the Satellites and Grid together from user parameters.
+
+        Generally x -> East, y -> North, and z -> Up
         """
 
         # Satellites
-        self.satellite_directions = torch.tensor(satellite_directions)
+        if isinstance(satellite_directions, Tensor):
+            self.satellite_directions = satellite_directions
+        else:
+            self.satellite_directions = torch.tensor(satellite_directions)
+        assert len(self.satellite_directions.shape) == 2
+        assert self.satellite_directions.shape[1] == 3
 
         # Grid
-        self.grid_x_len, self.grid_y_len = grid_size
+        assert len(grid_size) == 2
+        assert len(grid_bounds) == 4
+        self.grid_x_num, self.grid_y_num = grid_size
         self.grid_x_min, self.grid_x_max, self.grid_y_min, self.grid_y_max = grid_bounds
-        self.nerf_alt = alt
+        
+        assert isinstance(z_plane, float)
+        self.z_plane = z_plane
 
         self.full_grid = self._init_make_grid()
+        assert self.full_grid.shape == (self.grid_y_num, self.grid_x_num, 3), \
+            f"Full Grid is of size {self.full_grid.shape}, but expected " + \
+            f"grid size {grid_size}."
 
         # Auxiliary paramaters
+        assert isinstance(pixel_area, float)
         self.pixel_area = torch.tensor([pixel_area])
 
     def check_bounds(self):
@@ -200,11 +215,11 @@ class SatAndGrid:
         # but, y goes max -> min
         # It is also important we use "xy" indexing to match ENU
         grid_x, grid_y = torch.meshgrid(
-            torch.linspace(self.grid_x_min, self.grid_x_max, steps=self.grid_x_len),
-            torch.linspace(self.grid_y_max, self.grid_y_min, steps=self.grid_y_len),
+            torch.linspace(self.grid_x_min, self.grid_x_max, steps=self.grid_x_num),
+            torch.linspace(self.grid_y_max, self.grid_y_min, steps=self.grid_y_num),
             indexing='xy'
         )
-        grid_z = torch.tensor([self.nerf_alt]).reshape(1, 1).repeat(
+        grid_z = torch.tensor([self.z_plane]).reshape(1, 1).repeat(
             *grid_x.shape
         )
         return torch.stack(
@@ -223,6 +238,40 @@ class SatAndGrid:
                 self.full_grid, direction, self.pixel_area
             ) for direction in self.satellite_directions
         ]
+
+
+def get_sat_and_grid_from_json(sat_and_grid_params: Dict[str, Any]) -> SatAndGrid:
+    """
+    Takes a dictionary (from JSON) of satellite and grid parameters
+    """
+
+    # Satellites
+    satellite_enu_directions = sat_and_grid_params["satellite_enu_directions"]
+
+    # Grid
+    grid_x_num = sat_and_grid_params["grid_num_east"]
+    grid_y_num = sat_and_grid_params["grid_num_north"]
+
+    # IMPORTANT: In the future these will be Lat, Lon not NeRF Coords
+    # Hence, we will get a grid_lat_bounds and grid_lon_bounds
+    # that we will need to transfer to NeRF coordinates
+    grid_x_bounds = sat_and_grid_params["grid_bounds_east"]
+    grid_y_bounds = sat_and_grid_params["grid_bounds_north"]
+
+    # Similarly, this will altitude that we need to convert to NeRF Coords
+    z_plane = sat_and_grid_params["grid_up_plane"]
+
+    # Auxiliary paramaters
+    pixel_area = sat_and_grid_params["grid_area"]
+
+    return SatAndGrid(
+        satellite_directions=satellite_enu_directions,
+        grid_bounds=(*grid_x_bounds, *grid_y_bounds),
+        grid_size=(grid_x_num, grid_y_num),
+        z_plane=z_plane,
+        pixel_area=pixel_area
+    )
+
 
 
 @dataclass
@@ -249,6 +298,31 @@ class ShadowRenderer(RenderCameraPose):
         print("[Shadow Renderer] Computing Satellites & Grid...")
         # sat_and_grid = get_sat_and_grid_from_json(satellite_grids_filename)
         # shadow_cams = sat_and_grid.get_shadow_cameras()
+
+        sat_and_grid_params = {
+            "satellite_enu_directions":[[-6.82395927e-04,  8.59793005e-02,  9.96296690e-01],
+                                        [ 3.52654100e-01, -3.55976992e-01,  8.65399022e-01],
+                                        [ 6.68119077e-01,  5.68803053e-01,  4.79666536e-01],
+                                        [-7.70372852e-01,  2.59597404e-01,  5.82352863e-01],
+                                        [-9.37999502e-01,  1.76337054e-01,  2.98432869e-01],
+                                        [ 2.03725551e-01,  1.25803163e-01,  9.70911666e-01],
+                                        [-3.50202213e-02, -9.41419647e-01,  3.35414120e-01],
+                                        [ 5.06430401e-01,  5.81563778e-01,  6.36641046e-01],
+                                        [-7.18379069e-01,  4.29425366e-01,  5.47289109e-01],
+                                        [ 8.38455667e-01, -2.88599108e-01,  4.62279838e-01],
+                                        [ 3.62825361e-01, -5.51396912e-01,  7.51211823e-01],
+                                        [ 7.80072757e-01, -4.84298367e-01,  3.96158536e-01],
+                                        [-6.45188601e-01, -1.63485530e-02,  7.63848411e-01]],
+            "grid_num_east": 1003,
+            "grid_num_north": 1007,
+            "grid_bounds_east": [-1, 1],
+            "grid_bounds_north": [-1, 1],
+            "grid_up_plane": -0.54,
+            "grid_area": 0.001
+        }
+        sat_and_grid = get_sat_and_grid_from_json(sat_and_grid_params)
+        shadow_cams = sat_and_grid.get_shadow_cameras()
+
         print("[Shadow Renderer] ... Done")
 
         self.safe_output_path = generate_safe_path(self.output_path)
@@ -268,61 +342,61 @@ class ShadowRenderer(RenderCameraPose):
         # Also copy the current JSON
         dst = Path(self.safe_output_path, "camera_path.json")
 
-        grid_x_len = 1007   # Image Width
-        grid_y_len = 1003    # Image Height
-        nerf_alt   = -0.54
-        grid_x, grid_y = torch.meshgrid(
-            torch.linspace(-1,  1, steps=grid_x_len),
-            torch.linspace( 1, -1, steps=grid_y_len),
-            indexing='xy'
-        )
-        grid_z = torch.tensor([nerf_alt]).reshape(1, 1).repeat(
-            *grid_x.shape
-        )
-        origins = torch.stack(
-            (grid_x, grid_y, grid_z), dim=-1
-        )
-        # directions = torch.tensor(
-        #     # [-6.82395927e-04,  8.59793005e-02,  9.96296690e-01]
-        #     [0.000001, 0.0000001, 0.9999999999]
-        # ) 
-
-        directions = torch.tensor(
-           [[-6.82395927e-04,  8.59793005e-02,  9.96296690e-01],
-            [ 3.52654100e-01, -3.55976992e-01,  8.65399022e-01],
-            [ 6.68119077e-01,  5.68803053e-01,  4.79666536e-01],
-            [-7.70372852e-01,  2.59597404e-01,  5.82352863e-01],
-            [-9.37999502e-01,  1.76337054e-01,  2.98432869e-01],
-            [ 2.03725551e-01,  1.25803163e-01,  9.70911666e-01],
-            [-3.50202213e-02, -9.41419647e-01,  3.35414120e-01],
-            [ 5.06430401e-01,  5.81563778e-01,  6.36641046e-01],
-            [-7.18379069e-01,  4.29425366e-01,  5.47289109e-01],
-            [ 8.38455667e-01, -2.88599108e-01,  4.62279838e-01],
-            [ 3.62825361e-01, -5.51396912e-01,  7.51211823e-01],
-            [ 7.80072757e-01, -4.84298367e-01,  3.96158536e-01],
-            [-6.45188601e-01, -1.63485530e-02,  7.63848411e-01]]
-        )
-        pixel_area = torch.tensor([0.001])
-
-        print("Origins has shape: ", origins.shape)
-        print("Directions has shape: ", directions.shape)
-        print("Pixel Area has shape: ", pixel_area.shape)
-
-        # shadow_cam = SatelliteDirectionCamera(
-        #     origins, directions, pixel_area
+        # grid_x_len = 1007   # Image Width
+        # grid_y_len = 1003    # Image Height
+        # nerf_alt   = -0.54
+        # grid_x, grid_y = torch.meshgrid(
+        #     torch.linspace(-1,  1, steps=grid_x_len),
+        #     torch.linspace( 1, -1, steps=grid_y_len),
+        #     indexing='xy'
         # )
-        # print(f"Shadow Cam: {vars(shadow_cam)}")
+        # grid_z = torch.tensor([nerf_alt]).reshape(1, 1).repeat(
+        #     *grid_x.shape
+        # )
+        # origins = torch.stack(
+        #     (grid_x, grid_y, grid_z), dim=-1
+        # )
+        # # directions = torch.tensor(
+        # #     # [-6.82395927e-04,  8.59793005e-02,  9.96296690e-01]
+        # #     [0.000001, 0.0000001, 0.9999999999]
+        # # ) 
 
-        # shadow_cams = [
-        #     SatelliteDirectionCamera(
-        #         origins, direction, pixel_area
-        #     ) for direction in directions
-        # ]
+        # directions = torch.tensor(
+        #    [[-6.82395927e-04,  8.59793005e-02,  9.96296690e-01],
+        #     [ 3.52654100e-01, -3.55976992e-01,  8.65399022e-01],
+        #     [ 6.68119077e-01,  5.68803053e-01,  4.79666536e-01],
+        #     [-7.70372852e-01,  2.59597404e-01,  5.82352863e-01],
+        #     [-9.37999502e-01,  1.76337054e-01,  2.98432869e-01],
+        #     [ 2.03725551e-01,  1.25803163e-01,  9.70911666e-01],
+        #     [-3.50202213e-02, -9.41419647e-01,  3.35414120e-01],
+        #     [ 5.06430401e-01,  5.81563778e-01,  6.36641046e-01],
+        #     [-7.18379069e-01,  4.29425366e-01,  5.47289109e-01],
+        #     [ 8.38455667e-01, -2.88599108e-01,  4.62279838e-01],
+        #     [ 3.62825361e-01, -5.51396912e-01,  7.51211823e-01],
+        #     [ 7.80072757e-01, -4.84298367e-01,  3.96158536e-01],
+        #     [-6.45188601e-01, -1.63485530e-02,  7.63848411e-01]]
+        # )
+        # pixel_area = torch.tensor([0.001])
 
-        grid_bounds = [-1, 1, -1, 1]
-        grid_dims = [1007, 1003]
-        sat_and_grid = SatAndGrid(directions, grid_bounds, grid_dims, -0.54, 0.001)
-        shadow_cams = sat_and_grid.get_shadow_cameras()
+        # print("Origins has shape: ", origins.shape)
+        # print("Directions has shape: ", directions.shape)
+        # print("Pixel Area has shape: ", pixel_area.shape)
+
+        # # shadow_cam = SatelliteDirectionCamera(
+        # #     origins, directions, pixel_area
+        # # )
+        # # print(f"Shadow Cam: {vars(shadow_cam)}")
+
+        # # shadow_cams = [
+        # #     SatelliteDirectionCamera(
+        # #         origins, direction, pixel_area
+        # #     ) for direction in directions
+        # # ]
+
+        # grid_bounds = [-1, 1, -1, 1]
+        # grid_dims = [1007, 1003]
+        # sat_and_grid = SatAndGrid(directions, grid_bounds, grid_dims, -0.54, 0.001)
+        # shadow_cams = sat_and_grid.get_shadow_cameras()
 
         _render_shadow_images(
             pipeline=pipeline,
