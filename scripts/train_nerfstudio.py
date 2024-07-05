@@ -4,17 +4,38 @@ def config_parser():
     parser.add_argument("datadir", type=str, help='path to your data')
     parser.add_argument("--checkpoint", type=str, default=None, help='path to checkpoint directory (E.g. outputs/<dataset>/nerfacto/<date>/nerfstudio_models/)')
     parser.add_argument("--port", type=int, default=51224, help='port')
-    parser.add_argument("--num_sample", type=int, default=500, help='Number of training images to sample from')
+    parser.add_argument("--num_sample", type=int, default=600, help='Number of training images to sample from')
+    parser.add_argument("--num_rays_per_batch", type=int, default=256, help='Number of rays per batch')
     parser.add_argument("--save_latest", type=bool, default=True, help='Save only the latest checkpoint')
     parser.add_argument("--downscale_factor", type=float, default=None, help='Downscale factor')
-    parser.add_argument("--pose_optimizer", type=str, default="off", help='Pose optimizer mode')
-    parser.add_argument("--near_plane", type=float, default=0.1, help='Near plane')
+    parser.add_argument("--pose_optimizer", type=str, default="off", help='Pose optimizer mode (e.g. SO3xR3)')
+    parser.add_argument("--near_plane", type=float, default=0.05, help='Near plane')
     parser.add_argument("--far_plane", type=float, default=1000.0, help='Far plane')
 
     return parser
 
-def construct_command(data_folder, checkpoint, downscale_factor, port, num_sample, save_latest, pose_optimizer, near_plane, far_plane):
+def construct_command(args):
+    
+    data_folder = args.datadir
+    checkpoint = args.checkpoint
+    downscale_factor = args.downscale_factor
+    port = args.port
+    num_sample = args.num_sample
+    save_latest = args.save_latest
+    pose_optimizer = args.pose_optimizer
+    near_plane = args.near_plane
+    far_plane = args.far_plane
+    num_rays_per_batch = args.num_rays_per_batch
+
+    environment_variables = ""
+    # environment_variables = "export CUDA_VISIBLE_DEVICES=0 && export CUDA_LAUNCH_BLOCKING=1 &&"
+
     command_list = ["ns-train regional-nerfacto"]
+    # command_list = ["ns-train gaussian-splatting"]
+    # command_list = ["ns-train nerfacto"]
+    # command_list = ["ns-train neus-facto"]
+    
+    # command_list.append(f"--machine.num-devices 1")
     if port is not None:
         command_list.append(f"--vis viewer --viewer.websocket-port={port}")
     if num_sample is not None:
@@ -26,13 +47,20 @@ def construct_command(data_folder, checkpoint, downscale_factor, port, num_sampl
         command_list.append(f"--downscale-factor {downscale_factor}")
     if checkpoint is not None:
         command_list.append(f"--load-dir {checkpoint}")
-    command_list.append(f"--pipeline.datamanager.camera-optimizer.mode {pose_optimizer}")
+    command_list.append(f"--pipeline.model.camera-optimizer.mode {pose_optimizer}")
+    command_list.append(f"--pipeline.model.predict-normals True")
+    # command_list.append(f"--pipeline.datamanager.dataparser.orientation-method none")
+    # command_list.append(f"--pipeline.datamanager.dataparser.center-method focus")
+    # command_list.append(f"--pipeline.dataparser.eval_mode all")
+    # command_list.append(f"--pipeline.model.camera-optimizer.mode off")
     command_list.append(f"--logging.profiler pytorch")
+    command_list.append(f"--pipeline.datamanager.train-num-rays-per-batch {num_rays_per_batch}")
+    # command_list.append(f"--logging.profiler none")
     command_list.append(f"--pipeline.model.background_color random")
     command_list.append(f"--pipeline.model.near_plane {near_plane}")
     command_list.append(f"--pipeline.model.far_plane {far_plane}")
     command = " ".join(command_list)
-    return command
+    return environment_variables + command
 
 if __name__ == '__main__':
 
@@ -50,11 +78,12 @@ if __name__ == '__main__':
     pose_optimizer = args.pose_optimizer
     near_plane = args.near_plane
     far_plane = args.far_plane
+    num_rays_per_batch = args.num_rays_per_batch
 
     # Check if the data folder exists and is a directory
     if os.path.exists(data_folder) and os.path.isdir(data_folder):
         # Run the command using os.system
-        command = construct_command(data_folder, checkpoint, downscale_factor, port, num_sample, save_latest, pose_optimizer, near_plane, far_plane)
+        command = construct_command(args)
         
         print(command)
         os.system(command)

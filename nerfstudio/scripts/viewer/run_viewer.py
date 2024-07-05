@@ -16,11 +16,13 @@
 """
 Starts viewer in eval mode.
 """
+
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field, fields
 from pathlib import Path
+from threading import Lock
 from typing import Literal
 
 import tyro
@@ -30,8 +32,8 @@ from nerfstudio.engine.trainer import TrainerConfig
 from nerfstudio.pipelines.base_pipeline import Pipeline
 from nerfstudio.utils import writer
 from nerfstudio.utils.eval_utils import eval_setup
-from nerfstudio.viewer.server.viewer_state import ViewerState
-from nerfstudio.viewer_beta.viewer import Viewer as ViewerBetaState
+from nerfstudio.viewer.viewer import Viewer as ViewerState
+from nerfstudio.viewer_legacy.server.viewer_state import ViewerLegacyState
 
 
 @dataclass
@@ -53,7 +55,7 @@ class RunViewer:
     """Path to config YAML file."""
     viewer: ViewerConfigWithoutNumRays = field(default_factory=ViewerConfigWithoutNumRays)
     """Viewer configuration"""
-    vis: Literal["viewer", "viewer_beta"] = "viewer"
+    vis: Literal["viewer", "viewer_legacy"] = "viewer"
     """Type of viewer"""
 
     def main(self) -> None:
@@ -89,22 +91,26 @@ def _start_viewer(config: TrainerConfig, pipeline: Pipeline, step: int):
     viewer_log_path = base_dir / config.viewer.relative_log_filename
     banner_messages = None
     viewer_state = None
+    viewer_callback_lock = Lock()
+    if config.vis == "viewer_legacy":
+        viewer_state = ViewerLegacyState(
+            config.viewer,
+            log_filename=viewer_log_path,
+            datapath=pipeline.datamanager.get_datapath(),
+            pipeline=pipeline,
+            train_lock=viewer_callback_lock,
+        )
+        banner_messages = [f"Legacy viewer at: {viewer_state.viewer_url}"]
     if config.vis == "viewer":
         viewer_state = ViewerState(
             config.viewer,
             log_filename=viewer_log_path,
             datapath=pipeline.datamanager.get_datapath(),
             pipeline=pipeline,
+            share=config.viewer.make_share_url,
+            train_lock=viewer_callback_lock,
         )
-        banner_messages = [f"Viewer at: {viewer_state.viewer_url}"]
-    if config.vis == "viewer_beta":
-        viewer_state = ViewerBetaState(
-            config.viewer,
-            log_filename=viewer_log_path,
-            datapath=base_dir,
-            pipeline=pipeline,
-        )
-        banner_messages = [f"Viewer Beta at: {viewer_state.viewer_url}"]
+        banner_messages = viewer_state.viewer_info
 
     # We don't need logging, but writer.GLOBAL_BUFFER needs to be populated
     config.logging.local_writer.enable = False
@@ -116,7 +122,7 @@ def _start_viewer(config: TrainerConfig, pipeline: Pipeline, step: int):
         train_state="completed",
         eval_dataset=pipeline.datamanager.eval_dataset,
     )
-    if isinstance(viewer_state, ViewerState):
+    if isinstance(viewer_state, ViewerLegacyState):
         viewer_state.viser_server.set_training_state("completed")
     viewer_state.update_scene(step=step)
     while True:
@@ -126,11 +132,11 @@ def _start_viewer(config: TrainerConfig, pipeline: Pipeline, step: int):
 def entrypoint():
     """Entrypoint for use with pyproject scripts."""
     tyro.extras.set_accent_color("bright_yellow")
-    tyro.cli(RunViewer).main()
+    tyro.cli(tyro.conf.FlagConversionOff[RunViewer]).main()
 
 
 if __name__ == "__main__":
     entrypoint()
 
 # For sphinx docs
-get_parser_fn = lambda: tyro.extras.get_parser(RunViewer)  # noqa
+get_parser_fn = lambda: tyro.extras.get_parser(tyro.conf.FlagConversionOff[RunViewer])  # noqa

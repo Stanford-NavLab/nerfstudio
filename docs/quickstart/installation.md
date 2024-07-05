@@ -42,12 +42,12 @@ pip uninstall torch torchvision functorch tinycudann
 ```
 
 ::::{tab-set}
-:::{tab-item} Torch 2.0.1 with CUDA 11.8
+:::{tab-item} Torch 2.1.2 with CUDA 11.8 (recommended)
 
-Install PyTorch 2.0.1 with CUDA 11.8:
+Install PyTorch 2.1.2 with CUDA 11.8:
 
 ```bash
-pip install torch==2.0.1+cu118 torchvision==0.15.2+cu118 --extra-index-url https://download.pytorch.org/whl/cu118
+pip install torch==2.1.2+cu118 torchvision==0.16.2+cu118 --extra-index-url https://download.pytorch.org/whl/cu118
 ```
 
 To build the necessary CUDA extensions, `cuda-toolkit` is also required. We
@@ -121,6 +121,35 @@ ns-install-cli
 pip install -e .[dev]
 pip install -e .[docs]
 ```
+
+## Using Pixi
+[Pixi](https://pixi.sh/latest/) is a fast software package manager built on top of the existing conda ecosystem. Spins up development environments quickly on Windows, macOS and Linux. (Currently only linux is supported for nerfstudio)
+
+### Prerequisites
+Make sure to have pixi installed, detailed instructions [here](https://pixi.sh/latest/)
+
+TLDR for linux:
+
+```bash
+curl -fsSL https://pixi.sh/install.sh | bash
+```
+
+### Install Pixi Environmnent 
+After Pixi is installed, you can run
+```bash
+pixi run post-install
+pixi shell
+```
+This will install all enviroment dependancies including colmap, tinycudann and hloc, and the active the conda environment
+
+you could also run
+
+```bash
+pixi run post-install
+pixi run train-example-nerf
+```
+
+to download an example dataset and run nerfacto straight away
 
 ## Use docker image
 

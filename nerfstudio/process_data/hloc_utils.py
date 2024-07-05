@@ -26,28 +26,6 @@ from typing import Literal
 from nerfstudio.process_data.process_data_utils import CameraModel
 from nerfstudio.utils.rich_utils import CONSOLE
 
-try:
-    # TODO(1480) un-hide pycolmap import
-    import pycolmap
-    from hloc import (
-        extract_features,
-        match_features,
-        pairs_from_exhaustive,
-        pairs_from_retrieval,
-        reconstruction,
-    )
-except ImportError:
-    _HAS_HLOC = False
-else:
-    _HAS_HLOC = True
-
-try:
-    from pixsfm.refine_hloc import PixSfM  # type: ignore
-except ImportError:
-    _HAS_PIXSFM = False
-else:
-    _HAS_PIXSFM = True
-
 
 def run_hloc(
     image_dir: Path,
@@ -59,10 +37,18 @@ def run_hloc(
         "sift", "superpoint_aachen", "superpoint_max", "superpoint_inloc", "r2d2", "d2net-ss", "sosnet", "disk"
     ] = "superpoint_aachen",
     matcher_type: Literal[
-        "superglue", "superglue-fast", "NN-superpoint", "NN-ratio", "NN-mutual", "adalam"
+        "superglue",
+        "superglue-fast",
+        "NN-superpoint",
+        "NN-ratio",
+        "NN-mutual",
+        "adalam",
+        "disk+lightglue",
+        "superpoint+lightglue",
     ] = "superglue",
     num_matched: int = 50,
     refine_pixsfm: bool = False,
+    use_single_camera_mode: bool = True,
 ) -> None:
     """Runs hloc on the images.
 
@@ -77,7 +63,31 @@ def run_hloc(
         matcher_type: Type of feature matcher to use.
         num_matched: Number of image pairs for loc.
         refine_pixsfm: If True, refine the reconstruction using pixel-perfect-sfm.
+        use_single_camera_mode: If True, uses one camera for all frames. Otherwise uses one camera per frame.
     """
+
+    try:
+        # TODO(1480) un-hide pycolmap import
+        import pycolmap
+        from hloc import (  # type: ignore
+            extract_features,
+            match_features,
+            pairs_from_exhaustive,
+            pairs_from_retrieval,
+            reconstruction,
+        )
+    except ImportError:
+        _HAS_HLOC = False
+    else:
+        _HAS_HLOC = True
+
+    try:
+        from pixsfm.refine_hloc import PixSfM  # type: ignore
+    except ImportError:
+        _HAS_PIXSFM = False
+    else:
+        _HAS_PIXSFM = True
+
     if not _HAS_HLOC:
         CONSOLE.print(
             f"[bold red]Error: To use this set of parameters ({feature_type}/{matcher_type}/hloc), "
@@ -95,24 +105,30 @@ def run_hloc(
     features = outputs / "features.h5"
     matches = outputs / "matches.h5"
 
-    retrieval_conf = extract_features.confs["netvlad"]
-    feature_conf = extract_features.confs[feature_type]
-    matcher_conf = match_features.confs[matcher_type]
+    retrieval_conf = extract_features.confs["netvlad"]  # type: ignore
+    feature_conf = extract_features.confs[feature_type]  # type: ignore
+    matcher_conf = match_features.confs[matcher_type]  # type: ignore
 
     references = [p.relative_to(image_dir).as_posix() for p in image_dir.iterdir()]
-    extract_features.main(feature_conf, image_dir, image_list=references, feature_path=features)
+    extract_features.main(feature_conf, image_dir, image_list=references, feature_path=features)  # type: ignore
     if matching_method == "exhaustive":
-        pairs_from_exhaustive.main(sfm_pairs, image_list=references)
+        pairs_from_exhaustive.main(sfm_pairs, image_list=references)  # type: ignore
     else:
-        retrieval_path = extract_features.main(retrieval_conf, image_dir, outputs)
+        retrieval_path = extract_features.main(retrieval_conf, image_dir, outputs)  # type: ignore
         if num_matched >= len(references):
             num_matched = len(references)
-        pairs_from_retrieval.main(retrieval_path, sfm_pairs, num_matched=num_matched)
-    match_features.main(matcher_conf, sfm_pairs, features=features, matches=matches)
+        pairs_from_retrieval.main(retrieval_path, sfm_pairs, num_matched=num_matched)  # type: ignore
+    match_features.main(matcher_conf, sfm_pairs, features=features, matches=matches)  # type: ignore
 
-    image_options = pycolmap.ImageReaderOptions(camera_model=camera_model.value)
+    image_options = pycolmap.ImageReaderOptions(camera_model=camera_model.value)  # type: ignore
+
+    if use_single_camera_mode:  # one camera per all frames
+        camera_mode = pycolmap.CameraMode.SINGLE  # type: ignore
+    else:  # one camera per frame
+        camera_mode = pycolmap.CameraMode.PER_IMAGE  # type: ignore
+
     if refine_pixsfm:
-        sfm = PixSfM(
+        sfm = PixSfM(  # type: ignore
             conf={
                 "dense_features": {"use_cache": True},
                 "KA": {"dense_features": {"use_cache": True}, "max_kps_per_problem": 1000},
@@ -126,20 +142,20 @@ def run_hloc(
             features,
             matches,
             image_list=references,
-            camera_mode=pycolmap.CameraMode.SINGLE,
+            camera_mode=camera_mode,  # type: ignore
             image_options=image_options,
             verbose=verbose,
         )
         print("Refined", refined.summary())
 
     else:
-        reconstruction.main(
+        reconstruction.main(  # type: ignore
             sfm_dir,
             image_dir,
             sfm_pairs,
             features,
             matches,
-            camera_mode=pycolmap.CameraMode.SINGLE,
+            camera_mode=camera_mode,  # type: ignore
             image_options=image_options,
             verbose=verbose,
         )

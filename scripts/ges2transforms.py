@@ -34,6 +34,23 @@ def pad_rot(rot):
     rot_mat[-1,-1] = 1
     return rot_mat
 
+def get_elevation_usgs(lat, lon):
+    url = 'https://epqs.nationalmap.gov/v1/json?'
+
+    params = {
+        'x': lon,
+        'y': lat, 
+        'units': 'Meters',
+        'output': 'json'
+    }
+  
+    full_url = url + urllib.parse.urlencode(params)
+    print("Querying...", full_url)
+    response = requests.get(full_url)
+    data = json.loads(response.text)
+    print("...Done")
+    return data['value']
+    
 
 def config_parser():
     import configargparse
@@ -41,9 +58,11 @@ def config_parser():
     parser.add_argument("datadir", type=str, help='path to your meta')
     parser.add_argument("filename", type=str, help='file name')
     parser.add_argument("--imgdir", type=str, default='footage', help='image directory name')
-    parser.add_argument("lat", type=float, help='lat of center building')
-    parser.add_argument("lon", type=float, help='lon of center building')
-    
+    parser.add_argument("lat", type=float, help='lat of origin')
+    parser.add_argument("lon", type=float, help='lon of origin')
+    parser.add_argument("--height", type=float, default=None, help='height of origin from Earth center')
+    parser.add_argument("--scale", type=float, default=0.05, help='scale of world (aim to fit relevant region in +/- 1)')
+
     return parser
     
 
@@ -52,11 +71,15 @@ if __name__ == '__main__':
     parser = config_parser()
     args = parser.parse_args()
  
-    import numpy as np
+    import json
     import math
     import os
-    import json
-    import imageio  
+
+    import imageio
+    import numpy as np  
+
+    import requests 
+    import urllib
 
     with open(os.path.join(args.datadir, args.filename), 'r') as f:
         data = json.load(f)
@@ -68,12 +91,13 @@ if __name__ == '__main__':
 
     H, W, focal_x, focal_y = get_intrinsic(os.path.join(args.datadir, args.imgdir))
 
-    # rescale the whole range if you want
-    scale = 2**3 * np.pi / max(GES_pos.max(), -GES_pos.min())
+    # # rescale the whole range if you want
+    # scale = 2**3 * np.pi / max(GES_pos.max(), -GES_pos.min())
     SS = np.eye(4)
-    SS[0,0] = scale
-    SS[1,1] = scale
-    SS[2,2] = scale
+    SS[0,0] = args.scale
+    SS[1,1] = args.scale
+    SS[2,2] = args.scale
+
     
     rclat, rclng = np.radians(args.lat), np.radians(args.lon) 
     rot_ECEF2ENUV = np.array([[-math.sin(rclng),                math.cos(rclng),                              0],
@@ -85,6 +109,14 @@ if __name__ == '__main__':
     
     image_list = np.sort(os.listdir(os.path.join(args.datadir, args.imgdir)))
     
+    if args.height is None:
+        # TODO: find a better way to find the distance of earth surface from center of the earth
+        val = get_elevation_usgs(args.lat, args.lon)
+        # val = 0.0
+        height = float(val) + 6371e3 # min earth radius
+    else:
+        height = args.height 
+
     print("Found entries...", len(data['cameraFrames']))
     for i in range(len(data['cameraFrames'])):
         position = data['cameraFrames'][i]['position']
@@ -93,6 +125,8 @@ if __name__ == '__main__':
         pos_z = position['z']
         xyz = np.array([pos_x, pos_y, pos_z])
         [pos_e,pos_n,pos_u] = np.dot(rot_ECEF2ENUV, xyz)
+        pos_u = pos_u - height 
+        assert pos_u >= 0
 
         rotation = data['cameraFrames'][i]['rotation']
 
@@ -110,9 +144,15 @@ if __name__ == '__main__':
         GES_rotmat[:3,3] = np.array([nx,ny,nz])
 
         c2w = np.concatenate([GES_rotmat[:3,:4], np.array([[0, 0, 0, 1]])], 0)
-        
+
+        img_name_i = image_list[0][:-9] + '_' + str(i).zfill(3) + '.jpeg'
+        img_path = os.path.join(args.imgdir, img_name_i)
+        if img_name_i not in image_list:
+            print("Image not found, skipping...", img_path)
+            continue
+
         frame = {
-            "file_path": os.path.join(args.imgdir, image_list[i]),
+            "file_path": img_path,
             "transform_matrix": c2w.tolist(),
             "colmap_im_id": i,
         }
@@ -135,7 +175,10 @@ if __name__ == '__main__':
     out["k2"] = 0.0
     out["p1"] = 0.0
     out["p2"] = 0.0
-    out["scale"] = scale
+    out["scale"] = args.scale
+    out["lat"] = args.lat
+    out["lon"] = args.lon
+    out["height"] = height
         
     out["frames"] = frames
     # applied_transform = np.eye(4)[:3, :]

@@ -20,8 +20,8 @@ from __future__ import annotations
 
 import json
 import os
-import struct
 import shutil
+import struct
 import sys
 from contextlib import ExitStack
 from dataclasses import dataclass, field
@@ -32,26 +32,20 @@ import mediapy as media
 import numpy as np
 import torch
 import tyro
+import viser.transforms as tf
 from jaxtyping import Float
 from rich import box, style
 from rich.panel import Panel
-from rich.progress import (
-    BarColumn,
-    Progress,
-    TaskProgressColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
+from rich.progress import (BarColumn, Progress, TaskProgressColumn, TextColumn,
+                           TimeElapsedColumn, TimeRemainingColumn)
 from rich.table import Table
+from scipy.spatial import KDTree
 from torch import Tensor
 from typing_extensions import Annotated
 
-from nerfstudio.cameras.camera_paths import (
-    get_interpolated_camera_path,
-    get_path_from_json,
-    get_spiral_path,
-)
+from nerfstudio.cameras.camera_paths import (get_interpolated_camera_path,
+                                             get_path_from_json,
+                                             get_spiral_path)
 from nerfstudio.cameras.cameras import Cameras, CameraType
 from nerfstudio.data.datamanagers.base_datamanager import VanillaDataManager
 from nerfstudio.data.scene_box import SceneBox
@@ -123,7 +117,12 @@ def _render_trajectory_video(
         # but we don't know how big the video file will be, so it's not certain!)
 
     with ExitStack() as stack:
+        import numpy as np
+        from scipy.spatial import KDTree
+
         writer = None
+
+
 
         with progress:
             for camera_idx in progress.track(range(cameras.size), description=""):
@@ -133,46 +132,6 @@ def _render_trajectory_video(
                     bounding_box_max = crop_data.center + crop_data.scale / 2.0
                     aabb_box = SceneBox(torch.stack([bounding_box_min, bounding_box_max]).to(pipeline.device))
                 camera_ray_bundle = cameras.generate_rays(camera_indices=camera_idx, aabb_box=aabb_box)
-
-                if "nearest_camera" in rendered_output_names:
-                    cam_pos = cameras[camera_idx].camera_to_worlds[:, 3].cpu()
-                    cam_rot = Rotation.from_matrix(cameras[camera_idx].camera_to_worlds[:3, :3].cpu())
-                    cam_quat = cam_rot.as_quat()
-
-                    for i in range(len(train_cameras)):
-                        train_cam_pos = train_cameras[i].camera_to_worlds[:, 3].cpu()
-                        # Make sure the line of sight from rendered cam to training cam is not blocked by any object
-                        bundle = RayBundle(
-                            origins=cam_pos.view(1, 3),
-                            directions=((cam_pos - train_cam_pos) / (cam_pos - train_cam_pos).norm()).view(1, 3),
-                            pixel_area=torch.tensor(1).view(1, 1),
-                            nears=torch.tensor(0.05).view(1, 1),
-                            fars=torch.tensor(100).view(1, 1),
-                            camera_indices=torch.tensor(0).view(1, 1),
-                            metadata={},
-                        ).to(pipeline.device)
-                        outputs = pipeline.model.get_outputs(bundle)
-
-                        r = Rotation.from_matrix(train_cameras[i].camera_to_worlds[:3, :3].cpu())
-                        q = r.as_quat()
-                        # calculate distance between two quaternions
-                        rot_dist = 1 - np.dot(q, cam_quat) ** 2
-                        pos_dist = torch.norm(train_cam_pos - cam_pos)
-                        dist = 0.3 * rot_dist + 0.7 * pos_dist
-
-                        if true_max_dist == -1 or dist < true_max_dist:
-                            true_max_dist = dist
-                            true_max_idx = i
-
-                        if outputs["depth"][0] < torch.norm(cam_pos - train_cam_pos).item():
-                            continue
-
-                        if check_occlusions and (max_dist == -1 or dist < max_dist):
-                            max_dist = dist
-                            max_idx = i
-
-                    if max_idx == -1:
-                        max_idx = true_max_idx
 
                 if crop_data is not None:
                     with renderers.background_color_override_context(
@@ -218,23 +177,6 @@ def _render_trajectory_video(
                             .numpy()
                         )
                     render_image.append(output_image)
-                
-                # Add closest training image to the right of the rendered image
-                if "nearest_camera" in rendered_output_names:
-                    img = train_dataset.get_image(max_idx)
-                    resized_image = torch.nn.functional.interpolate(
-                        img.permute(2, 0, 1)[None], size=(int(cameras.image_height[0]), int(cameras.image_width[0]))
-                    )[0].permute(1, 2, 0)
-                    resized_image = (
-                        colormaps.apply_colormap(
-                            image=resized_image,
-                            colormap_options=colormap_options,
-                        )
-                        .cpu()
-                        .numpy()
-                    )
-                    render_image.append(resized_image)
-                
                 render_image = np.concatenate(render_image, axis=1)
                 if output_format == "images":
                     if image_format == "png":

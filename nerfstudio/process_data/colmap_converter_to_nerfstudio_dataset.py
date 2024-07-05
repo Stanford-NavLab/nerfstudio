@@ -29,7 +29,7 @@ from nerfstudio.utils.rich_utils import CONSOLE
 class ColmapConverterToNerfstudioDataset(BaseConverterToNerfstudioDataset):
     """Base class to process images or video into a nerfstudio dataset using colmap"""
 
-    camera_type: Literal["perspective", "fisheye", "equirectangular"] = "perspective"
+    camera_type: Literal["perspective", "fisheye", "equirectangular", "pinhole", "simple_pinhole"] = "perspective"
     """Camera model to use."""
     matching_method: Literal["exhaustive", "sequential", "vocab_tree"] = "vocab_tree"
     """Feature matching method to use. Vocab tree is recommended for a balance of speed
@@ -41,6 +41,9 @@ class ColmapConverterToNerfstudioDataset(BaseConverterToNerfstudioDataset):
     refine_pixsfm: bool = False
     """If True, runs refinement using Pixel Perfect SFM.
     Only works with hloc sfm_tool"""
+    refine_intrinsics: bool = True
+    """If True, do bundle adjustment to refine intrinsics.
+    Only works with colmap sfm_tool"""
     feature_type: Literal[
         "any",
         "sift",
@@ -63,6 +66,8 @@ class ColmapConverterToNerfstudioDataset(BaseConverterToNerfstudioDataset):
         "NN-ratio",
         "NN-mutual",
         "adalam",
+        "disk+lightglue",
+        "superpoint+lightglue",
     ] = "any"
     """Matching algorithm."""
     num_downscales: int = 3
@@ -96,6 +101,9 @@ class ColmapConverterToNerfstudioDataset(BaseConverterToNerfstudioDataset):
     """If --use-sfm-depth and this flag is True, also export debug images showing Sf overlaid upon input images."""
     same_dimensions: bool = True
     """Whether to assume all images are same dimensions and so to use fast downscaling with no autorotation."""
+    use_single_camera_mode: bool = True
+    """Whether to assume all images taken with the same camera characteristics, set to False for multiple cameras in colmap (only works with hloc sfm_tool).
+    """
 
     @staticmethod
     def default_colmap_path() -> Path:
@@ -131,6 +139,7 @@ class ColmapConverterToNerfstudioDataset(BaseConverterToNerfstudioDataset):
                     image_id_to_depth_path=image_id_to_depth_path,
                     camera_mask_path=camera_mask_path,
                     image_rename_map=image_rename_map,
+                    use_single_camera_mode=self.use_single_camera_mode,
                 )
                 summary_log.append(f"Colmap matched {num_matched_frames} images")
             summary_log.append(colmap_utils.get_matching_summary(num_frames, num_matched_frames))
@@ -153,7 +162,9 @@ class ColmapConverterToNerfstudioDataset(BaseConverterToNerfstudioDataset):
             depth_dir = self.output_dir / "depth"
             depth_dir.mkdir(parents=True, exist_ok=True)
             image_id_to_depth_path = colmap_utils.create_sfm_depth(
-                recon_dir=self.output_dir / self.default_colmap_path(),
+                recon_dir=self.absolute_colmap_model_path
+                if self.skip_colmap
+                else self.output_dir / self.default_colmap_path(),
                 output_dir=depth_dir,
                 include_depth_debug=self.include_depth_debug,
                 input_images_dir=self.image_dir,
@@ -189,6 +200,10 @@ class ColmapConverterToNerfstudioDataset(BaseConverterToNerfstudioDataset):
         if self.refine_pixsfm:
             assert sfm_tool == "hloc", "refine_pixsfm only works with sfm_tool hloc"
 
+        # check that sfm_tool is hloc if using use_single_camera_mode
+        if not self.use_single_camera_mode:
+            assert sfm_tool == "hloc", "not_use_single_camera_mode only works with sfm_tool hloc"
+
         # set the image_dir if didn't copy
         if self.skip_image_processing:
             image_dir = self.data
@@ -204,6 +219,7 @@ class ColmapConverterToNerfstudioDataset(BaseConverterToNerfstudioDataset):
                 gpu=self.gpu,
                 verbose=self.verbose,
                 matching_method=self.matching_method,
+                refine_intrinsics=self.refine_intrinsics,
                 colmap_cmd=self.colmap_cmd,
             )
         elif sfm_tool == "hloc":
@@ -222,6 +238,7 @@ class ColmapConverterToNerfstudioDataset(BaseConverterToNerfstudioDataset):
                 feature_type=feature_type,
                 matcher_type=matcher_type,
                 refine_pixsfm=self.refine_pixsfm,
+                use_single_camera_mode=self.use_single_camera_mode,
             )
         else:
             raise RuntimeError("Invalid combination of sfm_tool, feature_type, and matcher_type, " "exiting")
