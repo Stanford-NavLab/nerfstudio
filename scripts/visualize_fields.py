@@ -1,6 +1,15 @@
 """
 Visualize height field or DINO features from a trained model.
 
+Usage:
+    python scripts/visualize_fields.py path/to/config.yml
+e.g. 
+    python scripts/visualize_fields.py outputs/moon_spiral_2/terrain-nerf/2024-10-15_220925/config.yml
+
+
+NOTE: currently nerfstudio expects this to be called from the nerfstudio directory (for the load config/pipeline
+call, since data is a relative path).
+
 """
 
 import argparse
@@ -41,13 +50,12 @@ def vis_height_field(N=512, bounds=[-1., 1., -1., 1.], gradients=False):
     x = xy[:,0] 
     y = xy[:,1] 
     heights = pipeline.model.field.positions_to_heights(positions)
-    #heights = pipeline.model.field.nemo(positions)
     z = heights.detach().cpu().numpy().flatten()
 
     print("Min z: ", z.min())
     print("Max z: ", z.max())
 
-    fig = go.Figure(data=[go.Surface(x=x.reshape(N, N), y=y.reshape(N, N), z=z.reshape(N, N), colorscale='Viridis')])
+    fig = go.Figure(data=[go.Surface(x=x.reshape(N, N), y=y.reshape(N, N), z=z.reshape(N, N), colorscale='Viridis', showscale=False)])
     fig.update_layout(title='Elevation Model', width=1600, height=900)
     fig.update_layout(scene_aspectmode='data')
     fig.show()
@@ -87,17 +95,6 @@ def vis_dino_features(N=512, bounds=[-1., 1., -1., 1.]):
 
 if __name__ == '__main__':
 
-    # TODO: argparser: config.yml path
-    #config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/RedRocks/terrain-nerfacto/2024-03-15_175147/config.yml'))  # RedRocks MLP sine
-    #config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/RedRocks/terrain-nerfacto/2024-03-15_194521/config.yml'))  # RedRocks MLP relu
-    #config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/GES_KT22/terrain-nerfacto/2024-05-09_184038/config.yml')) # KT22 MLP relu
-    #config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/GES_KT22/terrain-nerfacto/2024-03-21_132915/config.yml'))  # GES Moon MLP relu
-    #config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/RedRocks/terrain-nerfacto/2024-04-11_160510/config.yml'))  # RedRocks w/DINO
-    #config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/CraterMountain/terrain-nerfacto/2024-04-18_151549/config.yml'))  # Crater Mountain
-    #config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/AirSimMountains/terrain-nerfacto/2024-05-09_185714/config.yml'))  # AirSim LandscapeMountains
-    #config, pipeline, checkpoint_path, _ = eval_setup(Path('outputs/moon_spiral/terrain-nerfacto/2024-05-21_165443/config.yml')) # AirSim Moon
-
-
     parser = argparse.ArgumentParser(description='Trained model path.')
     parser.add_argument('config_path', type=str, help='Path to config.yml file.')
 
@@ -106,7 +103,7 @@ if __name__ == '__main__':
 
     config, pipeline, checkpoint_path, _ = eval_setup(Path(config_path))
 
-    fig, grad_fig = vis_height_field(N=512, bounds=np.array([-.75, .45, -.6, .6]), gradients=True)
+    fig, grad_fig = vis_height_field(N=512, bounds=[-1., 1., -1., 1.], gradients=True)
 
     # Extract scene name from config_path
     scene_name = config_path.split('/')[1]
@@ -114,8 +111,7 @@ if __name__ == '__main__':
     # Get path up to config.yml
     save_path = '/'.join(config_path.split('/')[:-1])
 
-    print(pipeline.model.field.encoder.encoding_config)
-
+    # print(pipeline.model.field.encoder.encoding_config)
 
     torch.save(pipeline.model.field.encoder.state_dict(), f'{save_path}/{scene_name}_encs.pth')
     torch.save(pipeline.model.field.height_net.state_dict(), f'{save_path}/{scene_name}_mlp.pth')

@@ -1,0 +1,224 @@
+[14:50:28] Using --data alias for --data.pipeline.datamanager.data                                          train.py:230
+──────────────────────────────────────────────────────── Config ────────────────────────────────────────────────────────
+TrainerConfig(
+    _target=<class 'nerfstudio.engine.trainer.Trainer'>,
+    output_dir=PosixPath('outputs/JackLakeLag'),
+    method_name='nerfacto',
+    experiment_name='JackLakeLag90Percent',
+    project_name='nerfstudio-project',
+    timestamp='2024-08-26_145028',
+    machine=MachineConfig(seed=42, num_devices=1, num_machines=1, machine_rank=0, dist_url='auto', device_type='cuda'),
+    logging=LoggingConfig(
+        relative_log_dir=PosixPath('.'),
+        steps_per_log=10,
+        max_buffer_size=20,
+        local_writer=LocalWriterConfig(
+            _target=<class 'nerfstudio.utils.writer.LocalWriter'>,
+            enable=True,
+            stats_to_track=(
+                <EventName.ITER_TRAIN_TIME: 'Train Iter (time)'>,
+                <EventName.TRAIN_RAYS_PER_SEC: 'Train Rays / Sec'>,
+                <EventName.CURR_TEST_PSNR: 'Test PSNR'>,
+                <EventName.VIS_RAYS_PER_SEC: 'Vis Rays / Sec'>,
+                <EventName.TEST_RAYS_PER_SEC: 'Test Rays / Sec'>,
+                <EventName.ETA: 'ETA (time)'>
+            ),
+            max_log_size=10
+        ),
+        profiler='basic'
+    ),
+    viewer=ViewerConfig(
+        relative_log_filename='viewer_log_filename.txt',
+        websocket_port=None,
+        websocket_port_default=7007,
+        websocket_host='0.0.0.0',
+        num_rays_per_chunk=32768,
+        max_num_display_images=512,
+        quit_on_train_completion=False,
+        image_format='jpeg',
+        jpeg_quality=75,
+        make_share_url=False,
+        camera_frustum_scale=0.1,
+        default_composite_depth=True
+    ),
+    pipeline=VanillaPipelineConfig(
+        _target=<class 'nerfstudio.pipelines.base_pipeline.VanillaPipeline'>,
+        datamanager=ParallelDataManagerConfig(
+            _target=<class 'nerfstudio.data.datamanagers.parallel_datamanager.ParallelDataManager'>,
+            data=PosixPath('data/JackLakeLag/90_percent'),
+            masks_on_gpu=False,
+            images_on_gpu=False,
+            dataparser=NerfstudioDataParserConfig(
+                _target=<class 'nerfstudio.data.dataparsers.nerfstudio_dataparser.Nerfstudio'>,
+                data=PosixPath('.'),
+                scale_factor=1.0,
+                downscale_factor=None,
+                scene_scale=1.0,
+                orientation_method='up',
+                center_method='poses',
+                auto_scale_poses=True,
+                eval_mode='fraction',
+                train_split_fraction=0.9,
+                eval_interval=8,
+                depth_unit_scale_factor=0.001,
+                mask_color=None,
+                load_3D_points=False
+            ),
+            train_num_rays_per_batch=4096,
+            train_num_images_to_sample_from=-1,
+            train_num_times_to_repeat_images=-1,
+            eval_num_rays_per_batch=4096,
+            eval_num_images_to_sample_from=-1,
+            eval_num_times_to_repeat_images=-1,
+            eval_image_indices=(0,),
+            collate_fn=<function nerfstudio_collate at 0x7f7951e4caf0>,
+            camera_res_scale_factor=1.0,
+            patch_size=1,
+            camera_optimizer=None,
+            pixel_sampler=PixelSamplerConfig(
+                _target=<class 'nerfstudio.data.pixel_samplers.PixelSampler'>,
+                num_rays_per_batch=4096,
+                keep_full_image=False,
+                is_equirectangular=False,
+                ignore_mask=False,
+                fisheye_crop_radius=None,
+                rejection_sample_mask=True,
+                max_num_iterations=100
+            ),
+            num_processes=1,
+            queue_size=2,
+            max_thread_workers=None
+        ),
+        model=NerfactoModelConfig(
+            _target=<class 'nerfstudio.models.nerfacto.NerfactoModel'>,
+            enable_collider=True,
+            collider_params={'near_plane': 2.0, 'far_plane': 6.0},
+            loss_coefficients={'rgb_loss_coarse': 1.0, 'rgb_loss_fine': 1.0},
+            eval_num_rays_per_chunk=32768,
+            prompt=None,
+            near_plane=0.05,
+            far_plane=1000.0,
+            background_color='last_sample',
+            hidden_dim=64,
+            hidden_dim_color=64,
+            hidden_dim_transient=64,
+            num_levels=16,
+            base_res=16,
+            max_res=2048,
+            log2_hashmap_size=19,
+            features_per_level=2,
+            num_proposal_samples_per_ray=(256, 96),
+            num_nerf_samples_per_ray=48,
+            proposal_update_every=5,
+            proposal_warmup=5000,
+            num_proposal_iterations=2,
+            use_same_proposal_network=False,
+            proposal_net_args_list=[
+                {'hidden_dim': 16, 'log2_hashmap_size': 17, 'num_levels': 5, 'max_res': 128, 'use_linear': False},
+                {'hidden_dim': 16, 'log2_hashmap_size': 17, 'num_levels': 5, 'max_res': 256, 'use_linear': False}
+            ],
+            proposal_initial_sampler='piecewise',
+            interlevel_loss_mult=1.0,
+            distortion_loss_mult=0.002,
+            orientation_loss_mult=0.0001,
+            pred_normal_loss_mult=0.001,
+            use_proposal_weight_anneal=True,
+            use_appearance_embedding=True,
+            use_average_appearance_embedding=True,
+            proposal_weights_anneal_slope=10.0,
+            proposal_weights_anneal_max_num_iters=1000,
+            use_single_jitter=True,
+            predict_normals=False,
+            disable_scene_contraction=False,
+            use_gradient_scaling=False,
+            implementation='tcnn',
+            appearance_embed_dim=32,
+            average_init_density=0.01,
+            camera_optimizer=CameraOptimizerConfig(
+                _target=<class 'nerfstudio.cameras.camera_optimizers.CameraOptimizer'>,
+                mode='SO3xR3',
+                trans_l2_penalty=0.01,
+                rot_l2_penalty=0.001,
+                optimizer=None,
+                scheduler=None
+            )
+        )
+    ),
+    optimizers={
+        'proposal_networks': {
+            'optimizer': AdamOptimizerConfig(
+                _target=<class 'torch.optim.adam.Adam'>,
+                lr=0.01,
+                eps=1e-15,
+                max_norm=None,
+                weight_decay=0
+            ),
+            'scheduler': ExponentialDecaySchedulerConfig(
+                _target=<class 'nerfstudio.engine.schedulers.ExponentialDecayScheduler'>,
+                lr_pre_warmup=1e-08,
+                lr_final=0.0001,
+                warmup_steps=0,
+                max_steps=200000,
+                ramp='cosine'
+            )
+        },
+        'fields': {
+            'optimizer': AdamOptimizerConfig(
+                _target=<class 'torch.optim.adam.Adam'>,
+                lr=0.01,
+                eps=1e-15,
+                max_norm=None,
+                weight_decay=0
+            ),
+            'scheduler': ExponentialDecaySchedulerConfig(
+                _target=<class 'nerfstudio.engine.schedulers.ExponentialDecayScheduler'>,
+                lr_pre_warmup=1e-08,
+                lr_final=0.0001,
+                warmup_steps=0,
+                max_steps=200000,
+                ramp='cosine'
+            )
+        },
+        'camera_opt': {
+            'optimizer': AdamOptimizerConfig(
+                _target=<class 'torch.optim.adam.Adam'>,
+                lr=0.001,
+                eps=1e-15,
+                max_norm=None,
+                weight_decay=0
+            ),
+            'scheduler': ExponentialDecaySchedulerConfig(
+                _target=<class 'nerfstudio.engine.schedulers.ExponentialDecayScheduler'>,
+                lr_pre_warmup=1e-08,
+                lr_final=0.0001,
+                warmup_steps=0,
+                max_steps=5000,
+                ramp='cosine'
+            )
+        }
+    },
+    vis='wandb',
+    data=PosixPath('data/JackLakeLag/90_percent'),
+    prompt=None,
+    relative_model_dir=PosixPath('nerfstudio_models'),
+    load_scheduler=True,
+    steps_per_save=2000,
+    steps_per_eval_batch=500,
+    steps_per_eval_image=500,
+    steps_per_eval_all_images=25000,
+    max_num_iterations=30000,
+    mixed_precision=True,
+    use_grad_scaler=False,
+    save_only_latest_checkpoint=True,
+    load_dir=None,
+    load_step=None,
+    load_config=None,
+    load_checkpoint=None,
+    log_gradients=False,
+    gradient_accumulation_steps={}
+)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+           Saving config to:                                                                    experiment_config.py:136
+           outputs/JackLakeLag/JackLakeLag90Percent/nerfacto/2024-08-26_145028/config.yml                               
+           Saving checkpoints to:                                                                         trainer.py:137
+           outputs/JackLakeLag/JackLakeLag90Percent/nerfacto/2024-08-26_145028/nerfstudio_models                        
